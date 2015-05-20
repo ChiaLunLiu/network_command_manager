@@ -11,23 +11,19 @@ typedef struct _event{
 	char *buf ; /* buffer for event to use */
 }event_t;
 typedef struct _EventFactory{
-	list_t* eventlist;
 	list_t* list_sys;
 	list_t* list_user;
 	list_t* list_script;
 }eventfactory_t;
 
 event_t* event_alloc();
-void event_init(const event_t* __restrict__ e);
-
+void event_init( event_t* const  e);
 
 void eventfactory_init(eventfactory_t *__restrict__ ef);
-void event_register(eventfactory_t* __restrict__ ef, const char*  ename, void(*event)(char*) );
-void event_find(eventfactory_t* __restrict__ ef, const char* __restrict__ ename);
-
-void event_script_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(char*));
-void event_sys_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(char*));
-void event_user_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(char*));
+void event_process(eventfactory_t* __restrict__ ef, const char*  __restrict__ ename,int type,int is_on);
+void event_script_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename);
+void event_sys_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*));
+void event_user_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*));
 #endif
 
 
