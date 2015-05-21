@@ -3,7 +3,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-void addPermanentRule();
+
+
+
+
+
+void update_permanent_rule(int ty)
+{
+	if(ty == 0)
+		system("sh script/permanent.sh start");
+	else
+		system("sh script/permanent.sh stop");
+}
 
 void event_test_sys(void* arg)
 {
@@ -20,7 +31,12 @@ int main()
 	ef = malloc( sizeof( eventfactory_t));
 	eventfactory_init(ef);
 	
+	update_permanent_rule(0);
+	
+	/* sys event */
 	event_sys_register(ef,"test", event_test_sys);
+	event_sys_register(ef,"dhcp", event_test_sys);
+	
 	event_user_register(ef,"test",event_test_user);
 	event_script_register(ef,"./test.sh");
 	

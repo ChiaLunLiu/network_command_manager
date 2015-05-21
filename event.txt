@@ -1,0 +1,39 @@
+permanent rule
+------------------------->
+1.iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+2. iptables -A FORWARD -i $sys_br_if -p tcp -m state --state INVALID -j DROP
+1. 4g card customization rule
+
+<------------------------
+1. network_mode_changed , basic rules, vpn
+2. wifi_changed
+3. dynamic_qos
+4. L3 mgmt_filter
+5. L3 data_filter
+6. mss_clamp
+7. Access Restriction
+8. dscp tag
+9. firewall_changed
+10 .traffic control
+11. vlan tag
+12.Support VPN passthrough
+13. multicast filter
+14. app
+     a. DHCP
+     b. NTP
+     c. OMA
+     d. ACS
+     e. DNS
+     f. SNMP
+     g. UPNP
+     h. telnet
+     i. http/https
+     j. VOIP
+15. wan ping
+16. L2 filter
+17. port trigger
+18. port forward
+19. DMZ
+20. wifi multicast
+21. mutliple pdn
+
