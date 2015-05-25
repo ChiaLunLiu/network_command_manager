@@ -5,19 +5,20 @@ permanent rule
 1. 4g card customization rule
 
 <------------------------
-1. network_mode_changed , basic rules, vpn
-2. wifi_changed
-3. dynamic_qos
-4. L3 mgmt_filter
-5. L3 data_filter
+builtin 
 6. mss_clamp
-7. Access Restriction
-8. dscp tag
-9. firewall_changed
-10 .traffic control
-11. vlan tag
-12.Support VPN passthrough
-13. multicast filter
+
+
+-------------
+
+
+
+
+Caller DB
+
+5. L3 filter: called by db
+16. L2 filter: called by db
+25. firewall enable : called by db.
 14. app
      a. DHCP
      b. NTP
@@ -28,12 +29,34 @@ permanent rule
      g. UPNP
      h. telnet
      i. http/https
-     j. VOIP
-15. wan ping
-16. L2 filter
+ DDNS
+dscp tag
+20. wifi multicast
 17. port trigger
 18. port forward
-19. DMZ
-20. wifi multicast
-21. mutliple pdn
+12.Support VPN passthrough
 
+-------------------------------
+Network Manager
+
+VOIP
+vpn setup/teardown: default routing rule
+3. dynamic_qos
+9. firewall_changed
+10 .traffic control
+11. vlan tag
+7. Access Restriction
+19. DMZ
+21. snat interface: interface
+22. vpn snat interface: interface
+22. mgmt pdn routing rule: interface
+23. data pdn routing rule: interface1, ... interfacen
+24. voip pdn routing rule: interface
+26. allow ping from wan :
+27. allow https login from wan : 
+28. https login port from wan : 
+29. redirect icmp to host: 
+30. ip passthrough
+    wimax mgmt routing rule: interface
+    wimax data routing rule: interface1 .... interfacen
+    wimax voip routing rule: interface
