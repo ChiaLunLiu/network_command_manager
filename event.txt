@@ -13,11 +13,11 @@ permanent rule
 6. mss_clamp
 7. Access Restriction
 8. dscp tag
-9. firewall_changed
-10 .traffic control
+9. firewall enable/disable
+10. traffic control
 11. vlan tag
 12.Support VPN passthrough
-13. multicast filter
+13. multicast filter ??? re-design ? 
 14. app
      a. DHCP
      b. NTP
@@ -34,6 +34,8 @@ permanent rule
 17. port trigger
 18. port forward
 19. DMZ
-20. wifi multicast
-21. mutliple pdn
-
+20. wifi multicast ( block multicast to wifi )
+21. ip passthrough
+22. data pdn
+23. voip pdn
+24. mgmt pdn
