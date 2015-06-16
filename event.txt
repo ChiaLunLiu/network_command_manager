@@ -1,19 +1,43 @@
+-------------------------
 permanent rule
-------------------------->
+-------------------------
 1.iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
 2. iptables -A FORWARD -i $sys_br_if -p tcp -m state --state INVALID -j DROP
-1. 4g card customization rule
 
-<------------------------
-builtin 
+##########################
+
+
+
+3. 4g card customization rule
 6. mss_clamp
 7. Access Restriction
 8. dscp tag
+	1. mgmt
+	2. data
+	3. voip
+	4. soft phone voip
+
 9. firewall enable/disable
+	% set default filter INPUT policy to DROP/ACCEPT
 10. traffic control
+	% tc is based on interface
+	% alloc mininum/maximum bandwidth
+	1. mgmt interface
+	2. data
+	3. voip interface
+	4. lan interface
 11. vlan tag
-12.Support VPN passthrough
-13. multicast filter ??? re-design ? 
+	message: interface name/vlan id/van priority
+	1. mgmt interface 
+	2. data interface
+	3. voip interface
+
+12.VPN passthrough
+	message:
+	frame 1: pptp or l2tp or pppoe or gre 
+
+13. multicast filter
+	message:
 -------------
 5. L3 filter: called by db
 16. L2 filter: called by db
@@ -29,7 +53,6 @@ builtin
      h. telnet
      i. http/https
  DDNS
-dscp tag
 20. wifi multicast
 17. port trigger
 18. port forward
