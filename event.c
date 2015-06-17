@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
+#include "testlib.h"
 
 
 event_t* event_alloc()
@@ -19,7 +19,6 @@ void event_init( event_t* const  e)
 	e->buf = NULL;
 	e->name = NULL;
 	e->task = NULL;
-	e->cms_key = NULL;
 }
 void eventfactory_init(eventfactory_t *__restrict__ ef)
 {
@@ -28,14 +27,13 @@ void eventfactory_init(eventfactory_t *__restrict__ ef)
 	ef->list_sys    = list_alloc();
 }
 
-void event_register(int type,eventfactory_t* __restrict__ ef, const char*  __restrict__ ename, void(*task)(void*),const char* cms_key)
+void event_register(int type,eventfactory_t* __restrict__ ef, const char*  __restrict__ ename, void(*task)(void*))
 {
 		event_t* ev = event_alloc();
 		event_init(ev);
 		ev->name = strdup(ename);
 		ev->task = task;
 		ev->type = type;
-		ev->cms_key = cms_key;
 		switch(type){
 		case EVENTSCRIPT:
 			list_add(ef->list_script,ename,ev);
@@ -103,34 +101,28 @@ void event_process(eventfactory_t* __restrict__ ef, const char*  __restrict__ en
 				free(ev->buf);
 				ev->buf = NULL;
 			}
-			if(ev->cms_key){
-				value = cms_get_value(ev->cms_key);
-				if(!value){
-						dbg("cms value not found\n");
-				}
-				else if(!strcmp(value,"enable") ) ev->task(ev);
-			}
+				ev->task(ev);
 		break;
 		default:
 			printf("undefined type\n");
 		break;
 	}
 }
-inline void event_script_register(eventfactory_t* __restrict__ ef, const char* __restrict__ scriptname, const char*  cms_key)
+inline void event_script_register(eventfactory_t* __restrict__ ef, const char* __restrict__ scriptname)
 {
-	event_register(EVENTSCRIPT,ef, scriptname, NULL,cms_key);
+	event_register(EVENTSCRIPT,ef, scriptname, NULL);
 }
-inline void event_sys_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*), const char*  cms_key)
+inline void event_sys_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*))
 {
-	event_register(EVENTSYS,ef, ename, event,cms_key);
+	event_register(EVENTSYS,ef, ename, event);
 }
-inline void event_user_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*), const char*  cms_key)
+inline void event_user_register(eventfactory_t* __restrict__ ef, const char* __restrict__ ename, void(*event)(void*))
 {
-	event_register(EVENTUSER,ef, ename, event,cms_key);
+	event_register(EVENTUSER,ef, ename, event);
 }
 /* registered app event */
 
-void app_dhcp(event_t* arg)
+void app_dhcp_server(event_t* arg)
 {
 	/* dmz enable */
 	char* sys_firewall = NULL;
@@ -149,7 +141,7 @@ void app_dhcp(event_t* arg)
 		dbg("malloc fails\n");
 		return ;
 	}
-	
+		
 	mode = get_current_mode();
 	if (!strcmp(sys_firewall,"enable") ){
 		system("iptables -A INPUT -p udp --dport 67 -j ACCEPT;"
@@ -160,7 +152,7 @@ void app_dhcp(event_t* arg)
 	
 	switch(mode){
 		case NAT:
-		if( !strcmp(sys_dmz_enable,"enable")){
+		if( !strcmp(ui_dmz_enable,"enable")){
 			systemf("iptables -t nat -A PREROUTING -i %s -p udp --dport 68 -j ACCEPT",sys_ext_if);
 			stringbuffer_add_f(arg->buf,"iptables -t nat -D PREROUTING -i %s -p udp --dport 68 -j ACCEPT",sys_ext_if);
 		}
@@ -179,5 +171,144 @@ void app_dhcp(event_t* arg)
 		break;
 	}
 }
+void app_ntp(event_t* arg)
+{
+	/* ntp is always enabled */
+	
+	char* sys_dmz_enable;
+	char* sys_ext_if;
+	char* sys_firewall;
+	const char dmz_rule[] = "iptables -t nat %s PREROUTING -i %s -p udp --dport 123 -j ACCEPT;";
+	const char ntp_rule[] = "iptables %s INPUT -p udp --dport 123 -j ACCEPT;";
+	int mode;
+	
+	arg->buf = stringbuffer_alloc();
+	
+	if(!arg->buf){
+		dbg("malloc fails\n");
+		return ;
+	}
+	
+	mode = get_current_mode();
+	
+	if(mode == NAT){
+		if( !strcmp(sys_dmz_enable,"enable")){
+			systemf(dmz_rule,"-A",sys_ext_if);
+			stringbuffer_add_f(arg->buf,dmz_rule,"-D",sys_ext_if);
+		}
+	}
+	
+	if(!strcmp(sys_firewall,"enable")){
+			systemf(ntp_rule,"-A");
+			stringbuffer_add_f(arg->buf,ntp_rule,"-D");
+	}
+	
+	
+}
 
+void app_oma(event_t* arg)
+{
+	char* dm_oma;
+	char* sys_dmz_enable;
+	char* sys_ext_if;
+	int mode;
+	const char* dmz_rule[]="iptables -t nat %s PREROUTING -i %s -p tcp --dport 7547 -j ACCEPT;\
+							iptables -t nat %s PREROUTING -i %s -p udp --dport 2948 -j ACCEPT;";
+	
+	
+	const char* fw_rule[]="iptables %s INPUT -p tcp --dport 7547 -j ACCEPT;\
+						   iptables %s INPUT -p udp --dport 2948 -j ACCEPT;";
+			              
+	mode = get_current_mode();
+	
+	              
+	if(!strcmp(dm_oma,"disable") )return;
+	
+	arg->buf = stringbuffer_alloc();
+	
+	if(!arg->buf){
+		dbg("malloc fails\n");
+		return ;
+	}
+	if( mode == NAT){
+		if( !strcmp(sys_dmz_enable,"enable")){
+			systemf(dmz_rule,"-A",sys_ext_if,"-A",sys_ext_if);
+			stringbuffer_add_f(arg->buf,dmz_rule,"-D",sys_ext_if,"-D",sys_ext_if);
+		}
+	}
+	
+	if(!strcmp(dm_oma,"enable") ){
+			systemf(fw_rule,"-A");
+			stringbuffer_add_f(arg->buf,fw_rule,"-D");
+	}
+}
 
+void app_acs(event_t* arg)
+{
+	char* dm_tr069;
+	char* sys_dmz_enable;
+	char* sys_ext_if;
+	int mode;
+	
+	const char dmz_rule[]="iptables -t nat %s PREROUTING -i %s -p tcp --dport 58603 -j ACCEPT;";
+	const char fw_rule[]="iptables %s INPUT -p tcp --dport 58603 -j ACCEPT;";
+	
+	mode = get_current_mode();
+	if(!strcmp(dm_tr069,"disable") )return;
+	
+	arg->buf = stringbuffer_alloc();
+	
+	if(!arg->buf){
+		dbg("malloc fails\n");
+		return ;
+	}
+	if( mode == NAT){
+		if( !strcmp(sys_dmz_enable,"enable")){
+			systemf(dmz_rule,"-A", sys_ext_if);
+			stringbuffer_add_f(arg->buf,dmz_rule,"-D",sys_ext_if);
+		}
+	}
+
+	systemf(fw_rule,"-A");
+	stringbuffer_add_f(arg->buf,fw_rule,"-D");
+}
+
+void app_dns(event_t* arg)
+{
+	char* dm_tr069;
+	char* sys_dmz_enable;
+	char* sys_ext_if;
+	char* dns_server; //TODO new key
+	int mode;
+	const char* dmz_rule = "iptables -t nat %s PREROUTING -i %s -p tcp --dport 53 -j ACCEPT;"\
+					       "iptables -t nat %s PREROUTING -i %s -p tcp --dport 53 -j ACCEPT;";
+	const char* dns_rule = "iptables %s INPUT -p tcp --dport 58603 -j ACCEPT;";
+	
+	if(!strcmp(dns_server,"disable") )return;
+	
+	
+	
+	arg->buf = stringbuffer_alloc();
+	if(!arg->buf){
+		dbg("malloc fails\n");
+		return ;
+	}
+	mode = get_current_mode();
+	
+	if( mode == NAT && !strcmp(sys_dmz_enable,"enable")){
+		systemf(dmz_rule,"-A",sys_ext_if,sys_ext_if);
+		stringbuffer_add_f(arg->buf,dmz_rule,"-D",sys_ext_if,sys_ext_if);
+	}
+	
+	if(mode == NAT || mode == ROUTER){
+		systemf(dns_rule,"-A");
+		stringbuffer_add_f(arg->buf,dns_rule,"-D");
+	}
+}
+
+void dmz(event_t* arg)
+{
+	int mode = get_current_mode();
+	char* sys_firewall;
+	
+}
