@@ -57,7 +57,6 @@ permanent rule
 17. port trigger
 18. port forward
 19. DMZ
-20. wifi multicast ( block multicast to wifi )
 21. ip passthrough
 22. data pdn
 23. voip pdn
