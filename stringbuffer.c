@@ -19,6 +19,10 @@ stringbuffer_t* stringbuffer_alloc()
 	b->max_size = INITIAL_BUF_SIZE;
 	return b;
 }
+void stringbuffer_clear(stringbuffer_t* b)
+{
+	b->current_size = 0;
+}
 void stringbuffer_add(stringbuffer_t* b, const char* data)
 {
 	int len = strlen(data);

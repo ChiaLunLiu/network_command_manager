@@ -10,6 +10,7 @@ typedef struct _buffer{
 stringbuffer_t* stringbuffer_alloc();
 void stringbuffer_add(stringbuffer_t* b, const char* data);
 void stringbuffer_add_f(stringbuffer_t* b,const char *format, ...);
+void stringbuffer_clear(stringbuffer_t* b);
 void stringbuffer_destroy(stringbuffer_t* b);
 const char* stringbuffer_get(stringbuffer_t *b);
 #endif
