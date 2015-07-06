@@ -42,7 +42,7 @@ int systemf(const char* format, ...)
     va_end (argptr);
     
     if(!string){
-		dbg("system command not executed\n");
+		nfc_dbg("system command not executed\n");
 		return -1;
 	}
 	

@@ -27,8 +27,7 @@ int main()
 	nfc_t* center;
 	
 	/* create network function center */
-	center = nfc_alloc();
-	event_register(center,"mode setup",
+	center = nfc_create();
 
         sigemptyset(&mask);
         sigaddset(&mask, SIGINT);
@@ -94,6 +93,7 @@ int main()
 				m = minimsg_recv(socket);
 				printf("server receives message\n");
 				msg_print(m);
+				nfc_msg_process(center,m);
 				msg_free(m);
 			}
 			else if(sfd == events[i].data.fd){
@@ -111,6 +111,7 @@ end:
 	free(events);
 	close(sfd);	
 	close(efd);
+	nfc_free(center);
 	minimsg_free_context(ctx);
 	return 0;
 }
