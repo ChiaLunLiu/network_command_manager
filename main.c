@@ -11,7 +11,16 @@
 #include <sys/signalfd.h>
 #include <signal.h>
 #include "nfc_event.h"
+#include <event2/event.h>
+
 #define MAX_EVENTS 8
+static void signal_handler(int fd, short event, void *arg)
+{
+	void* base = arg;
+	if(event_base_loopbreak(base) == -1) nfc_handle_error("event_base_loopbreak fails\n");	
+}
+
+
 int main()
 {
 	minimsg_context_t* ctx;
@@ -24,27 +33,23 @@ int main()
         int sfd;
         struct signalfd_siginfo fdsi;
         ssize_t s;
+	void* base;
 	nfc_t* center;
+	struct event* data_event;
+	struct event* signal_event;
+        base = event_base_new();
+        if(!base) nfc_handle_error("event_base_new()");
+        if(data_efd == -1 || control_efd == -1) goto error;
+        data_event=event_new(base, data_efd, EV_READ|EV_PERSIST, data_handler, (void*)ctx );
+        signal_event = event_new(base,SIGINT, EV_SIGNAL,signal_handler,base);
+
+        if(!signal_event || !data_event) nfc_handle_error("event_new");
+	event_add(signal_event,NULL);
+	event_add(data_event,NULL);
+
 	
 	/* create network function center */
 	center = nfc_create();
-
-        sigemptyset(&mask);
-        sigaddset(&mask, SIGINT);
-
-        /* Block signals so that they aren't handled
-           according to their default dispositions */
-
-        if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) handle_error("sigprocmask");
-
-        sfd = signalfd(-1, &mask, 0);
-        if (sfd == -1) handle_error("signalfd");
-	
-	efd = epoll_create1(0);
-	if(efd == -1){
-		perror("epoll_create");
-		return 0;
-	}
 
 	ctx = minimsg_create_context();
 	if(!ctx){

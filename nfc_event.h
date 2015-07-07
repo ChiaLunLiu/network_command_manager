@@ -29,8 +29,17 @@
 
 
 #define NO_PRIORITY INT_MAX
+
+
 struct _event;
 typedef struct _event event_t;
+
+typedef struct _timer_data{
+	int fd;
+	event_t* ev;
+	msg_t* m;
+	
+}timer_data_t;
 
 typedef struct _event_info{
 	const char* event_name;
@@ -42,6 +51,10 @@ typedef struct _network_function_center{
 	list_t* list_event;
 	/* element is of type (event_t*,number of rule in the table) */
 	list_t* chain[MAX_CHAIN];
+	list_t*	list_other_rule;	/* keep ip, route cmd */
+	list_t* list_timer; /* element is of type (timerfd, event_t*, msg_t* m) */	
+	int id_pool; /* only increase , assume that it won't overflow */
+	int efd; /* epoll fd */
 }nfc_t;
 
 struct _event{

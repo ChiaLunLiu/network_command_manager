@@ -11,6 +11,15 @@ typedef struct _str_int_pair{
 	int value;
 }str_int_pair_t;
 
+typedef struct _drule{
+	int id;
+	event_t* ev;
+	stringbuffer_t* del_cmd;
+}del_rule_t;
+
+/* del_rule_t function */
+del_rule_t* del_rule_alloc();
+void del_rule_free(del_rule_t* r);
 
 /* declaration for event function */
 static void mode_setup(event_t* ev,const msg_t* m);
@@ -20,7 +29,7 @@ static void data_channel_setup(event_t* ev,const msg_t* m);
 static void voice_channel_setup(event_t* ev,const msg_t* m);
 static void dscp_tag(event_t* ev,const msg_t* m);
 static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m);
-
+static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 
 
 /* variable defination */
@@ -63,17 +72,75 @@ static event_t * event_search(nfc_t* center,const char* name);
 
 
 static int chain_str_to_int(const char* tool,const char* table, const char* chain);
-static void add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
+static int add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
 static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...);
-static void del_rule(event_t* ev);
+static void del_event_all_rules(event_t* ev);
+static void del_rule_by_id(nfc_t* center,int id);
+static int  add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
 
 
+/*
+ * del_rule_by_id
+ * delete iptables, ebtables rule by id
+ *
+ */
+static void del_rule_by_id(nfc_t* center,int id)
+{
+	
+	list_t* list;
+	list_iterator_t* it;
+	list_node_t* prev, * ln;
+	const char* cmd;
+	del_rule_t* r;
+	int i;
+	int dummy=0;
+	/* chain[i] keeps iptables, ebtables del cmd */
+	for(i=0;i< MAX_CHAIN ; i++){
+    		it = list_iterator_new(center->chain[i], LIST_HEAD);
+		prev = list_iterator_next(it);
+    		while(prev){
+			ln = list_iterator_next(it);
+			r = (del_rule_t*) prev->val;
+			if( r->id == id){
+				list_remove(center->chain[i],prev);
+				cmd = stringbuffer_get(r->del_cmd);
+				nfc_dbg("%s\n",cmd);
+				dummy=system(cmd);
+				del_rule_free(r);
+				dummy = 1;
+			}
+			prev = ln;
+		}
+    		list_iterator_destroy(it);
+    	}
+
+	/* list_other_rule keeps, ip, route del cmd */
+    	it = list_iterator_new(center->list_other_rule, LIST_HEAD);
+	prev = list_iterator_next(it);
+    	while(prev){
+		ln = list_iterator_next(it);
+		r = (del_rule_t*) prev->val;
+		if( r->id == id){
+			list_remove(center->list_other_rule,prev);
+			cmd = stringbuffer_get(r->del_cmd);
+			nfc_dbg("%s\n",cmd);
+			dummy=system(cmd);
+			del_rule_free(r);
+			dummy = 1;
+		}
+		prev= ln;
+	}
+    	list_iterator_destroy(it);
+	
+	
+	if(dummy==0) nfc_dbg("delete noting\n");
+}
 /*
  * del_rule
  * go through all list in center and remove the rules if its corresponding event matches the one
  * to delete   
  */
-static void del_rule(event_t* ev)
+static void del_event_all_rules(event_t* ev)
 {
 	list_t* list;
 	list_iterator_t* it;
@@ -81,87 +148,120 @@ static void del_rule(event_t* ev)
 	nfc_t* center;
 	const char* cmd;
 	int i;
+	del_rule_t* r;
 	int dummy;
+	nfc_dbg("delete rules of %s\n",ev->info->event_name);
 	center = ev->center;
 	for(i=0;i< MAX_CHAIN ; i++){
     		it = list_iterator_new(center->chain[i], LIST_HEAD);
 		prev = list_iterator_next(it);
     		while(prev){
 			ln = list_iterator_next(it);
-			if( ev == (event_t*) prev->val){
+			r = (del_rule_t*) prev->val;
+			if( r->ev == ev ){
 				list_remove(center->chain[i],prev);
-				dbg("remove %s in list %d\n",ev->name,i);
+				cmd = stringbuffer_get(r->del_cmd);
+				nfc_dbg("%s\n",cmd);
+				dummy=system(cmd );
+				del_rule_free(r);
 			}
 			prev = ln;
 		}
     		list_iterator_destroy(it);
     	}
-	cmd = stringbuffer_get(ev->del_cmd);
-	dbg("%s\n",cmd);
-	if(strcmp(cmd,""))	dummy=system(cmd );
-	stringbuffer_clear(ev->del_cmd);
-	ev->del_cmd = NULL;
+	/* list_other_rule keeps, ip, route del cmd */
+    	it = list_iterator_new(center->list_other_rule, LIST_HEAD);
+	prev = list_iterator_next(it);
+    	while(prev){
+		ln = list_iterator_next(it);
+		r = (del_rule_t*) prev->val;
+		if( r->ev == ev){
+			list_remove(center->list_other_rule,prev);
+			cmd = stringbuffer_get(r->del_cmd);
+			nfc_dbg("%s\n",cmd);
+			dummy=system(cmd);
+			del_rule_free(r);
+			dummy = 1;
+		}
+		prev= ln;
+	}
+    	list_iterator_destroy(it);
+
 }
 static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...)
 {
 	char* string;
 	va_list argptr;
+	del_rule_t* r;
+	list_node_t* ln;
+	nfc_dbg("\n");
+	r = del_rule_alloc();
+	ln = list_node_new(r);
+	if(!ln) nfc_handle_error("list_node_new");
 	
-	dbg("\n");
+	r->id = ev->center->id_pool++;
+	r->ev = ev;
     	va_start (argptr, format);
     	string = zsys_vprintf (format, argptr);
     	va_end (argptr);
 	if(!string) nfc_handle_error("null string");
-	systemf("ip %s add %s;\n",tool,string);
-    	stringbuffer_add_f(ev->del_cmd,"ip %s del %s;\n",tool,string);
+	systemf("ip %s add %s",tool,string);
+	
+    	stringbuffer_add_f(r->del_cmd,"ip %s del %s",tool,string);
+	list_rpush(ev->center->list_other_rule,ln);
+
 }
-static void add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...)
+static int  add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...)
 {
-    va_list argptr;
-    unsigned i;
-    nfc_t* center;
-    unsigned idx;
-    unsigned sz;
-    int cnt = 0;
-    list_t* list;
-    event_t* tmp_ev;
-    list_node_t* ln_new,*ln;
-    list_iterator_t* it;
-    int insert_pos = -1;
-
+	va_list argptr;
+	unsigned i;
+	nfc_t* center;
+	unsigned idx;
+	unsigned sz;
+	int cnt = 0;
+	list_t* list;
+	event_t* tmp_ev;
+	list_node_t* ln_new,*ln;
+	list_iterator_t* it;
+	int insert_pos = -1;
+	del_rule_t* dr;
+	char* string;
 	dbg("\n");
-    center = ev->center;
 
-    va_start (argptr, format);
-    char *string = zsys_vprintf (format, argptr);
-    va_end (argptr);
-    if(!string) nfc_handle_error("rules_changed");
+    	center = ev->center;
+	dr = del_rule_alloc();
+	
 
-    sz = sizeof(chain_mapping);
-    for(i=0;i< sz ; i++){
-	if(!strcmp(chain_mapping[i].tool,tool) && !strcmp(chain_mapping[i].table,table) && !strcmp(chain_mapping[i].chain,chain) ){
-		break;
-	}
-    }
-    if(i == sz) nfc_handle_error("fail to find mapping for (%s,%s,%s)\n",tool,table,chain);
+    	va_start (argptr, format);
+    		string = zsys_vprintf (format, argptr);
+    	va_end (argptr);
+    	if(!string) nfc_handle_error("rules_changed");
 
-    list = center->chain[i];
+    	sz = sizeof(chain_mapping);
+    	for(i=0;i< sz ; i++){
+		if(!strcmp(chain_mapping[i].tool,tool) && !strcmp(chain_mapping[i].table,table) && !strcmp(chain_mapping[i].chain,chain) ){
+			break;
+		}
+    	}
+    	if(i == sz) nfc_handle_error("fail to find mapping for (%s,%s,%s)\n",tool,table,chain);
 
+    	list = center->chain[i];
+	
     	it = list_iterator_new(list, LIST_HEAD);
 
     	while(ln = list_iterator_next(it) ){
 		tmp_ev = (event_t*)ln->val;
-		if(ev->info->priority < tmp_ev->info->priority){
+		if(ev->info->priority[i] < tmp_ev->info->priority[i]){
 			/* add it here */
 			insert_pos = cnt;
 			break;			
 		} 
 		cnt++;
-        	printf("str=%s\n",(char*)ln->val);
+        	printf("addr=%s\n",(char*)ln->val);
     	}
     	list_iterator_destroy(it);
 
-        ln_new = list_node_new(ev);
+        ln_new = list_node_new(dr);
 	if(!ln_new) nfc_handle_error("list_node_new");
         
     	if(insert_pos == -1){
@@ -171,10 +271,13 @@ static void add_rule(event_t* ev,const char* tool, const char* table, const char
 	else
 		list_insert(list,ln,ln_new);
 
+	
     	systemf("%s -t %s -I %s %d %s",tool,table,insert_pos+1,chain,string);
 
-    	stringbuffer_add_f(ev->del_cmd,"%s -t %s -D %s %s;",tool,table,chain,string);
+    	stringbuffer_add_f(dr->del_cmd,"%s -t %s -D %s %s",tool,table,chain,string);
     	free(string);
+
+	return dr->id;
 }
 nfc_t* nfc_create()
 {
@@ -190,6 +293,13 @@ nfc_t* nfc_create()
 	center->list_event = list_new();
 	if(!center->list_event) nfc_handle_error("list_new");
 
+	center->list_timer = list_new();
+	if(!center->list_timer) nfc_handle_error("list_new");
+
+	center->list_other_rule = list_new();
+	if(!center->list_other_rule) nfc_handle_error("list_new");
+
+	center->id_pool = 0;	
 	/* register event */
 	sz = sizeof(event_info);
 	for(i = 0 ;i < sz ; i++){
@@ -215,6 +325,10 @@ void nfc_free(nfc_t* center)
 		stringbuffer_destroy(ev->del_cmd);
 		free(ln);
 	}
+	//TODO
+	free(center->list_other_rule);
+	free(center->list_timer);
+	free(center->list_event);
 	free(center);
 }
 
@@ -615,11 +729,15 @@ static void dscp_tag(event_t* ev,const msg_t* m)
 	del_rule(ev);
 	
 	for(i=0;i<num;i++){
-		add_rule("mangle","POSTROUTING","-o %s -j DSCP --set-dscp %s;\n",interface,dscp_value);
+		add_rule(ev,"mangle","POSTROUTING","-o %s -j DSCP --set-dscp %s;\n",interface,dscp_value);
 		if(!strcmp(is_sip,"1")){
-			add_rule(ev,"mangle","PREROUTING","-i %s -p udp --sport 5060 -j NFQUEUE --queue-num 0;\n");
+			add_rule(ev,"mangle","PREROUTING","-i %s -p udp --sport 5060 -j NFQUEUE --queue-num 0;\n",interface);
 		}
 	}
+	
+}
+static void timer_dscp_callback(timer_data_t* td)
+{
 	
 }
 static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m)
@@ -629,14 +747,84 @@ static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m)
 	const char* media_ip;
 	const char* media_port;
 	const char* interface;
+	msg_t* mc;
+	timer_data_t* td;
 	int timeout_value;
-	
+
+
+	td = (timer_data_t*) malloc(sizeof( timer_data_t));
+	if(!td) nfc_handle_error("malloc");
+	mc = msg_alloc();
+	if( !mc) nfc_handle_error("msg alloc fails");
+		
+
 	remove_all = msg_content_at_frame(m,1);
 	dscp_value = msg_content_at_frame(m,1);
 	media_ip = msg_content_at_frame(m,1);
 	media_port = msg_content_at_frame(m,1);
 	interface = msg_content_at_frame(m,1);
-	timeout_value = msg_content_at_frame(m,1);
+	timeout_value = atoi(msg_content_at_frame(m,1));
 	
+	msg_append_string(mc,media_ip);
+	msg_append_string(mc,media_port);
 	
+	td->m = mc;
+	td->ev = ev;
+	td->callback =  timer_dscp_callback;
+
+	nfc_add_timer(ev,mc,timer_dscp_callback,timeout_value);
+
+	
+}
+static void nfc_add_timer(event_t* ev,msg_t *m, void(*callback)(timer_data_t* td), int timeout_value)
+{
+	struct itimerspec new_value;
+	struct timespec now;	
+	int fd;
+	list_node_t*	ln;
+	nfc_t*	center;
+	timer_data_t* td;
+
+	td = (timer_data_t*) malloc( sizeof( timer_data_t) );
+	if(!td ) handle_error("malloc");
+	ln = list_node_new(td);
+	if(!ln ) handle_error("list_node_new");
+	fd = timerfd_create(CLOCK_REALTIME, 0);
+	if(fd == -1) handle_error("timerfd_create");
+
+	td->fd = fd;
+	td->m = m;
+	td->ev = ev;
+	td->callback = callback;
+	center = ev->center;
+
+	if (clock_gettime(CLOCK_REALTIME, &now) == -1) handle_error("clock_gettime");
+	new_value.it_value.tv_sec = now.tv_sec + timeout_value;
+        new_value.it_value.tv_nsec = now.tv_nsec;
+
+	if (timerfd_settime(fd, TFD_TIMER_ABSTIME, &new_value, NULL) == -1) handle_error("timerfd_settime");
+
+	list_rpush(center->list_timer,ln);	
+}
+	int id;
+	event_t* ev;
+	stringbuffer_t* del_cmd;
+}del_rule_t;
+
+/* del_rule_t function */
+del_rule_t* del_rule_alloc()
+{
+	del_rule_t* r;
+	r = (del_rule_t*) malloc(sizeof( del_rule_t));
+	if(!r) nfc_handle_error("malloc");
+	r->id = -1;
+	r->ev = NULL;
+	r->del_cmd = stringbuffer_alloc();
+	if(!ev->del_cmd) nfc_handle_error("stringbuffer_create fails\n");
+	return r;
+}
+void del_rule_free(del_rule_t* r)
+{
+	stringbuffer_destroy(r->del_cmd);
+	free(r);
 }
