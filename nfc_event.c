@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+
+
 typedef struct _str_int_pair{
 	const char* tool;
 	const char* table;
@@ -29,19 +31,53 @@ static void data_channel_setup(event_t* ev,const msg_t* m);
 static void voice_channel_setup(event_t* ev,const msg_t* m);
 static void dscp_tag(event_t* ev,const msg_t* m);
 static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m);
+static void dhcp(event_t* ev,const msg_t* m);
+static void dmz(event_t* ev,const msg_t* m);
+static void udhcpc(event_t* ev,const msg_t* m);
+static void ntp(event_t* ev,const msg_t* m);
+static void oma(event_t* ev,const msg_t* m);
+static void acs(event_t* ev,const msg_t* m);
+static void snmp(event_t* ev,const msg_t* m);
+static void dns(event_t* ev,const msg_t* m);
+static void telnet(event_t* ev,const msg_t* m);
+static void upnp(event_t* ev,const msg_t* m);
+static void pots(event_t* ev,const msg_t* m);
+static void http(event_t* ev,const msg_t* m);
+static void https(event_t* ev,const msg_t* m);
+static void access_restriction(event_t* ev,const msg_t* m);
+static void vpn_passthrough(event_t* ev,const msg_t* m);
+static void multicast_filter(event_t* ev,const msg_t* m);
+static void packet_filter(event_t* ev,const msg_t* m);
 static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 
 
 /* variable defination */
 /* the smaller value,the higher priority */
 static const event_info_t event_info[]={
-{"mode setup",mode_setup,	 	   		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
-{"nat",nat,		         	   		{0,0,0,0,0,0,0,0,0,0,0,0,0,-1,0,0,0,0,0,0,0} },
-{"ip passthrough",ip_passthrough,	   		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
-{"data channel setup",data_channel_setup,  		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
-{"voice channel setup",voice_channel_setup,		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
-{"dscp tag",dscp_tag,			   		{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
-{"dscp tagging with timeout",dscp_tagging_with_timeout, {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} },
+{"mode setup",mode_setup,	 	   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"nat",nat,		         	   		{0,0,0,0,0,0,0,0,0,0,0,0, 0,-1,0,0,0,0,0,0,0} },
+{"ip passthrough",ip_passthrough,	   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"data channel setup",data_channel_setup,  		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"voice channel setup",voice_channel_setup,		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"dscp tag",dscp_tag,			   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"dscp tagging with timeout",dscp_tagging_with_timeout, {0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"dmz",dmz,			   			{0,0,0,0,0,0,0,0,0,0,0,0,10, 0,0,0,0,0,0,0,0} },
+{"dhcp",dhcp,			   			{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"udhcpc",udhcpc,			   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"ntp",ntp,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"oma",oma,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"acs",acs,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"snmp",snmp,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"dns",dns,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"telnet",telnet,			   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"upnp",upnp,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"pots",pots,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"http",http,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"https",https,				   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"access restriction",access_restriction,   		{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"vpn passthrough",vpn_passthrough,   			{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"multicast filter",multicast_filter,  			{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
+{"packet filter",packet_filter,  			{0,0,0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,0,0,0,0,0} },
 };
 
 str_int_pair_t chain_mapping[]={
@@ -70,11 +106,10 @@ str_int_pair_t chain_mapping[]={
 
 static event_t * event_search(nfc_t* center,const char* name);
 
-
 static int chain_str_to_int(const char* tool,const char* table, const char* chain);
 static int add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
 static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...);
-static void del_event_all_rules(event_t* ev);
+static void del_rule_by_event(event_t* ev);
 static void del_rule_by_id(nfc_t* center,int id);
 static int  add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
 
@@ -136,11 +171,11 @@ static void del_rule_by_id(nfc_t* center,int id)
 	if(dummy==0) nfc_dbg("delete noting\n");
 }
 /*
- * del_rule
+ * del_rule_by_event
  * go through all list in center and remove the rules if its corresponding event matches the one
  * to delete   
  */
-static void del_event_all_rules(event_t* ev)
+static void del_rule_by_event(event_t* ev)
 {
 	list_t* list;
 	list_iterator_t* it;
@@ -293,15 +328,18 @@ nfc_t* nfc_create()
 	center->list_event = list_new();
 	if(!center->list_event) nfc_handle_error("list_new");
 
-	center->list_timer = list_new();
-	if(!center->list_timer) nfc_handle_error("list_new");
 
 	center->list_other_rule = list_new();
 	if(!center->list_other_rule) nfc_handle_error("list_new");
 
+	center->base = event_base_new();
+	
+	if(!center->base)nfc_handle_error("event_base_new");
+
 	center->id_pool = 0;	
 	/* register event */
-	sz = sizeof(event_info);
+	sz = sizeof(event_info)/sizeof(event_info_t);
+	nfc_dbg("sz = %d\n",sz);
 	for(i = 0 ;i < sz ; i++){
         	ev = malloc(sizeof( event_t));
         	if(!ev) nfc_handle_error("malloc");
@@ -312,6 +350,13 @@ nfc_t* nfc_create()
         	ln = list_node_new(ev);
         	if(!ln) nfc_handle_error("list_node_new");
         	list_rpush(center->list_event,ln);
+		
+		/* special handling for some event */
+		if(!strcmp(ev->info->event_name,"dscp tagging with timeout")){
+			/* mapping list of (ip,port) => timer_event */
+			ev->priv = (void*)list_new();
+			if(!ev->priv) nfc_handle_error("list_new");
+		}
         }
 	return center;
 
@@ -326,9 +371,10 @@ void nfc_free(nfc_t* center)
 		free(ln);
 	}
 	//TODO
+	// destroy dscp tagging with timeout
 	free(center->list_other_rule);
-	free(center->list_timer);
 	free(center->list_event);
+	event_base_free(center->base);
 	free(center);
 }
 
@@ -388,7 +434,7 @@ void mode_setup(event_t* ev, const msg_t* m)
 	nfc_t* center;
 	
 
-	del_rule(ev);
+	del_rule_by_event(ev);
 	center = ev->center;
 	network_mode = atoi(msg_content_at_frame(m,1));
 	
@@ -419,16 +465,6 @@ void mode_setup(event_t* ev, const msg_t* m)
 		default:
 		break;
 	}	
-}
-void vpn_passthrough(const msg_t* m)
-{
-	/* message structure */
-	/* gre
-	   l2tp
-           ipsec
-	   pptp
-	 */ 
-
 }
 void permanent_rule()
 {
@@ -502,27 +538,6 @@ void app_telnet(event_t* arg);
 void app_upnp(event_t*arg);
 void app_voip(event_t* arg);
 
-void dmz(event_t* arg)
-{
-/*	char* sys_ext_if=NULL;
-	char* ui_dmz_enable;
-	char* dhcp_enable; // TODO
-	int mode;
-	arg->buf = stringbuffer_alloc();
-	mode = get_current_mode();
-
-	switch(mode){
-		case MODE_NAT:
-		if( !strcmp(dhcp_enable,"enable")){
-			systemf("iptables -t nat -A PREROUTING -i %s -p udp --dport 68 -j ACCEPT",sys_ext_if);
-			stringbuffer_add_f(arg->buf,"iptables -t nat -D PREROUTING -i %s -p udp --dport 68 -j ACCEPT",sys_ext_if);
-		}
-		break;
-		default:
-		break;
-	}
-*/		
-}
 
 /*
  * nat
@@ -535,7 +550,7 @@ static void nat(event_t* ev,const msg_t* m)
 	nfc_t* center;
 
 	center = ev->center; 
-	del_rule(ev);
+	del_rule_by_event(ev);
 	num = atoi( msg_content_at_frame(m,1));
 
 	/* frame number checking */
@@ -594,7 +609,7 @@ static void data_channel_setup(event_t* ev,const msg_t* m)
 
 	op = msg_content_at_frame(m,1);
 
-	del_rule(ev);
+	del_rule_by_event(ev);
 
 	if(!strcmp(op,"0")){
 		return ;
@@ -665,7 +680,7 @@ static void voice_channel_setup(event_t* ev,const msg_t* m)
 
 	op = msg_content_at_frame(m,1);
 
-	del_rule(ev);
+	del_rule_by_event(ev);
 
 	if(!strcmp(op,"0")){
 		return ;
@@ -720,13 +735,13 @@ static void dscp_tag(event_t* ev,const msg_t* m)
 	const char* dscp_value;
 	const char* is_sip;
 	const char* interface;
-
+	nfc_dbg("\n");
 	num = atoi(msg_content_at_frame(m,1));
 	dscp_value = msg_content_at_frame(m,2);
 	is_sip = msg_content_at_frame(m,3);
 	interface = msg_content_at_frame(m,4);
 	
-	del_rule(ev);
+	del_rule_by_event(ev);
 	
 	for(i=0;i<num;i++){
 		add_rule(ev,"mangle","POSTROUTING","-o %s -j DSCP --set-dscp %s;\n",interface,dscp_value);
@@ -736,9 +751,47 @@ static void dscp_tag(event_t* ev,const msg_t* m)
 	}
 	
 }
-static void timer_dscp_callback(timer_data_t* td)
+static void dscp_timeout_callback(int fd, short event, void *arg)
 {
+	msg_t* m;
+	int rule_id;
+	event_t* ev;
+	nfc_t* center;
+	msg_t* m_mapping;
+	const char* media_ip;
+	const char* media_port;
+	list_iterator_t* it;
+	list_node_t* ln;
+	struct event* timer_event;
+	int found = 0;
+	nfc_dbg("\n");
+	m = (msg_t*) arg;
+
+	media_ip =  msg_content_at_frame(m,0);
+	media_port =  msg_content_at_frame(m,1);
+	ev = (event_t*) strtoul (msg_content_at_frame(m,2), NULL, 16);
+	center = (nfc_t*) strtoul (msg_content_at_frame(m,3), NULL, 16);
+	rule_id =  atoi(msg_content_at_frame(m,4));
+	timer_event = (struct event*) strtoul (msg_content_at_frame(m,5), NULL, 16);
+
+	nfc_dbg("id = %d\n",rule_id);
+	del_rule_by_id(center,rule_id);
+	/*find the timer and  remove from list*/
+	it = list_iterator_new((list_t*) ev->priv, LIST_HEAD);
+        while(ln = list_iterator_next(it)){
+		m_mapping = (msg_t*) ln->val;
+		if(m_mapping == m){
+			found = 1;
+			break;
+		}		
+	}
 	
+        list_iterator_destroy(it);	
+
+	if(!found) nfc_handle_error("fail to delete by %s:%s\n",media_ip,media_port);
+	list_remove((list_t*)ev->priv,ln);
+	event_del(timer_event);
+	msg_free(m);	
 }
 static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m)
 {
@@ -747,70 +800,92 @@ static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m)
 	const char* media_ip;
 	const char* media_port;
 	const char* interface;
-	msg_t* mc;
-	timer_data_t* td;
+	int enable;
+	struct event* timer_event;
+	msg_t* m_event,* m_mapping;
+	nfc_t* center;
 	int timeout_value;
-
-
-	td = (timer_data_t*) malloc(sizeof( timer_data_t));
-	if(!td) nfc_handle_error("malloc");
-	mc = msg_alloc();
-	if( !mc) nfc_handle_error("msg alloc fails");
-		
-
-	remove_all = msg_content_at_frame(m,1);
-	dscp_value = msg_content_at_frame(m,1);
-	media_ip = msg_content_at_frame(m,1);
-	media_port = msg_content_at_frame(m,1);
-	interface = msg_content_at_frame(m,1);
-	timeout_value = atoi(msg_content_at_frame(m,1));
+	struct timeval tv;
+	int rule_id;
+	list_node_t* ln;
+	list_iterator_t* it;
+	event_callback_fn cb;
+	void* event_arg;
+	int found = 0;
 	
-	msg_append_string(mc,media_ip);
-	msg_append_string(mc,media_port);
-	
-	td->m = mc;
-	td->ev = ev;
-	td->callback =  timer_dscp_callback;
-
-	nfc_add_timer(ev,mc,timer_dscp_callback,timeout_value);
-
-	
-}
-static void nfc_add_timer(event_t* ev,msg_t *m, void(*callback)(timer_data_t* td), int timeout_value)
-{
-	struct itimerspec new_value;
-	struct timespec now;	
-	int fd;
-	list_node_t*	ln;
-	nfc_t*	center;
-	timer_data_t* td;
-
-	td = (timer_data_t*) malloc( sizeof( timer_data_t) );
-	if(!td ) handle_error("malloc");
-	ln = list_node_new(td);
-	if(!ln ) handle_error("list_node_new");
-	fd = timerfd_create(CLOCK_REALTIME, 0);
-	if(fd == -1) handle_error("timerfd_create");
-
-	td->fd = fd;
-	td->m = m;
-	td->ev = ev;
-	td->callback = callback;
 	center = ev->center;
+	enable = atoi(msg_content_at_frame(m,1));
+	media_ip = msg_content_at_frame(m,2);
+	media_port = msg_content_at_frame(m,3);
+	dscp_value = msg_content_at_frame(m,4);
+	interface = msg_content_at_frame(m,5);
+	timeout_value = atoi(msg_content_at_frame(m,6));
 
-	if (clock_gettime(CLOCK_REALTIME, &now) == -1) handle_error("clock_gettime");
-	new_value.it_value.tv_sec = now.tv_sec + timeout_value;
-        new_value.it_value.tv_nsec = now.tv_nsec;
 
-	if (timerfd_settime(fd, TFD_TIMER_ABSTIME, &new_value, NULL) == -1) handle_error("timerfd_settime");
 
-	list_rpush(center->list_timer,ln);	
+
+	/* search for repeated */
+	it = list_iterator_new((list_t*) ev->priv, LIST_HEAD);
+        while(ln = list_iterator_next(it)){
+		m_mapping = (msg_t*) ln->val;		
+		if(!strcmp(media_ip,  msg_content_at_frame(m_mapping,0)) && 
+		   !strcmp(media_port,msg_content_at_frame(m_mapping,1))){
+			found = 1;
+			break;
+		}
+	}
+        list_iterator_destroy(it);	
+
+	if(!enable){
+		if(!found){
+			nfc_dbg("fail to remove from list by (%s,%s)\n",media_ip,media_port);
+			return;
+		}
+		nfc_dbg("disable dscp tagging for %s:%s\n",media_ip,media_port);		
+		list_remove((list_t*)ev->priv,ln);
+		timer_event = (struct event*) strtoul (msg_content_at_frame(m,5), NULL, 16);
+		cb = event_get_callback(timer_event);
+		event_arg = event_get_callback_arg(timer_event);
+
+		if(event_del(timer_event) == -1) nfc_handle_error("event_del");
+		cb(0,0,event_arg);
+
+		event_free(timer_event);	
+		msg_free(m_mapping);
+
+		return;
+	}
+	
+	if(found){
+		nfc_dbg("refresh the timer event\n");
+		timer_event = (struct event*) strtoul (msg_content_at_frame(m_mapping,5), NULL, 16);
+		if(event_add(timer_event,&tv) == -1) nfc_handle_error("event_add");
+		
+	}
+	else{
+		nfc_dbg("create new timer event\n");
+		rule_id = add_rule(ev,"mangle","POSTROUTING","-o %s -d %s --dport %s -j DSCP --set-dscp %s",interface,media_ip,media_port,dscp_value);
+		/* record timer_event by media ip and port */
+		m_mapping = msg_alloc();
+		if(!m_mapping) nfc_handle_error("msg_alloc");
+        	timer_event = event_new(center->base,-1, EV_TIMEOUT,dscp_timeout_callback,(void*)m_mapping);
+        	if(!timer_event)nfc_handle_error("event_new");
+
+		msg_append_string(m_mapping,media_ip);
+		msg_append_string(m_mapping,media_port);
+		msg_append_string_f(m_mapping,"%p",ev);
+		msg_append_string_f(m_mapping,"%p",center);
+		msg_append_string_f(m_mapping,"%d",rule_id);
+		msg_append_string_f(m_mapping,"%p",timer_event);
+
+		ln = list_node_new(m_mapping);
+		list_rpush((list_t*)ev->priv,ln);
+		tv.tv_sec  = timeout_value; 
+		tv.tv_usec = 0;
+        	if(event_add(timer_event,&tv)== -1) nfc_handle_error("event_add");
+	}
+	
 }
-	int id;
-	event_t* ev;
-	stringbuffer_t* del_cmd;
-}del_rule_t;
-
 /* del_rule_t function */
 del_rule_t* del_rule_alloc()
 {
@@ -820,11 +895,416 @@ del_rule_t* del_rule_alloc()
 	r->id = -1;
 	r->ev = NULL;
 	r->del_cmd = stringbuffer_alloc();
-	if(!ev->del_cmd) nfc_handle_error("stringbuffer_create fails\n");
+	if(!r->del_cmd) nfc_handle_error("stringbuffer_create fails\n");
 	return r;
 }
 void del_rule_free(del_rule_t* r)
 {
 	stringbuffer_destroy(r->del_cmd);
 	free(r);
+}
+
+/*
+ * dmz
+ */ 
+static void dmz(event_t* ev,const msg_t* m)
+{
+	int i;
+	int num;
+	int enable;
+	const char* interface;
+	const char* lan_ip;
+	msg_t* tmp_m;
+	nfc_dbg("\n");
+	num = atoi(msg_content_at_frame(m,1));
+	interface = msg_content_at_frame(m,2);
+	lan_ip = msg_content_at_frame(m,3);
+
+	del_rule_by_event(ev);
+	
+	for(i = 0 ;i <num ; i++){
+		 add_rule(ev,"nat","PREROUTING","-i %s -j DNAT --to %s",interface,lan_ip); 	
+	}
+	
+}
+/*
+ * dhcp
+ */
+static void dhcp(event_t* ev,const msg_t* m)
+{
+	nfc_dbg("\n");
+}
+/*
+ * udhcp
+ */
+static void udhcpc(event_t* ev,const msg_t* m)
+{
+	int enable;
+
+	nfc_dbg("\n");
+
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 68 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 68 -j ACCEPT");
+	
+
+}
+/*
+ * ntp
+ */
+static void ntp(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 123 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 123 -j ACCEPT");
+	
+}
+/*
+ * oma
+ */
+static void oma(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 2948 -j ACCEPT");
+	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 7547 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 2948 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 7547 -j ACCEPT");
+}
+/*
+ * acs
+ */
+static void acs(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 58603 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 58603 -j ACCEPT");
+}
+/*
+ * snmp
+ */
+static void snmp(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 161 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 161 -j ACCEPT");
+}
+/*
+ * dns
+ */
+static void dns(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 53 -j ACCEPT");
+	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 53 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 53 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 53 -j ACCEPT");
+}
+/*
+ * telnet
+ */
+static void telnet(event_t* ev,const msg_t* m)
+{
+	int enable;
+	int i;	
+	int num;
+	const char* interface;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+	num = atoi( msg_content_at_frame(m,2));
+	
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	for(i = 0 ;i<num ; i++){
+		interface = msg_content_at_frame(m,3+i);
+		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport 23 -j ACCEPT",interface);
+		add_rule(ev,"iptables","filter","INPUT","-i %s -p tcp --dport 23 -j ACCEPT",interface);
+	}
+}
+/*
+ * upnp
+ */
+static void upnp(event_t* ev,const msg_t* m)
+{
+	int enable;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 49152 -j ACCEPT");
+	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 1900 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 49152 -j ACCEPT");
+	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 1900 -j ACCEPT");
+}
+/*
+ * pots
+ * onboard phone
+ * remove the rules only when enable=0
+ * because pots would dynamically add new port
+ */
+static void pots(event_t* ev,const msg_t* m)
+{
+	
+	int enable;
+	int port;
+	const char* protocol;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+	port = atoi(msg_content_at_frame(m,2));
+	protocol = msg_content_at_frame(m,3);
+	
+	
+	if(!enable){
+		del_rule_by_event(ev);	
+		return;
+	}
+	add_rule(ev,"iptables","nat","PREROUTING","-p %s --dport %d -j ACCEPT",protocol,port);
+	add_rule(ev,"iptables","filter","INPUT","-p %s --dport %d -j ACCEPT",protocol,port);
+}
+/*
+ * http
+ */
+static void http(event_t* ev,const msg_t* m)
+{
+	int enable;
+	const char* port;
+	const char* protocol;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+	port = msg_content_at_frame(m,2);
+	protocol = msg_content_at_frame(m,3);
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p %s --dport %s -j ACCEPT",protocol,port);
+	add_rule(ev,"iptables","filter","INPUT","-p %s --dport %s -j ACCEPT",protocol,port);
+}
+/*
+ * https
+ */
+static void https(event_t* ev,const msg_t* m)
+{
+	int enable;
+	const char* port;
+	const char* protocol;
+	nfc_dbg("\n");
+	enable = atoi(msg_content_at_frame(m,1));
+	port = msg_content_at_frame(m,2);
+	protocol = msg_content_at_frame(m,3);
+
+	del_rule_by_event(ev);	
+	if(!enable) return;
+
+	add_rule(ev,"iptables","nat","PREROUTING","-p %s --dport %s -j ACCEPT",protocol,port);
+	add_rule(ev,"iptables","filter","INPUT","-p %s --dport %s -j ACCEPT",protocol,port);
+
+}
+/*
+ * access restriction
+ */
+static void access_restriction(event_t* ev,const msg_t* m)
+{
+	int i;
+	int num;
+	const char* mac_address;
+	const char* blocked_day;
+	const char* blocked_starting_time;
+	const char* blocked_ending_time;
+	const char* blocked_url;
+	const char* blocked_keyword;
+	stringbuffer_t* stringbuf;
+	nfc_dbg("\n");
+
+	del_rule_by_event(ev);	
+	
+	stringbuf = stringbuffer_alloc();
+	if(!stringbuf){
+		
+		nfc_dbg("fail to alloc stringbuf\n");
+		return;
+	}
+	num = atoi(msg_content_at_frame(m,1));
+
+	for(i = 0; i<num ; i++){
+		stringbuffer_clear(stringbuf);
+
+		mac_address = msg_content_at_frame(m,2+ 6*i);
+		blocked_day = msg_content_at_frame(m,3+6*i);
+		blocked_starting_time = msg_content_at_frame(m,4+6*i);
+		blocked_ending_time = msg_content_at_frame(m,5+6*i);
+		blocked_url = msg_content_at_frame(m,6+6*i);
+		blocked_keyword = msg_content_at_frame(m,7+6*i);
+
+		if(strcmp(mac_address,"none")){
+			stringbuffer_add_f(stringbuf,"-m mac --mac-source %s ",mac_address);
+		}
+		if(strcmp(blocked_day,"every day")){
+			stringbuffer_add_f(stringbuf,"-m time --weekdays %s ",blocked_day);
+		}
+		if(strcmp(blocked_starting_time,"none")){
+			stringbuffer_add_f(stringbuf,"-m time --timestart %s --timestop %s ",blocked_starting_time, blocked_ending_time);
+		}
+		if(strcmp(blocked_url,"none")){
+			stringbuffer_add_f(stringbuf,"-m webstr --url %s ",blocked_url);
+		}
+		if(strcmp(blocked_keyword,"none")){
+			stringbuffer_add_f(stringbuf,"-m string --algo bm --string %s ",blocked_keyword);
+		}	
+		add_rule(ev,"iptables","filter","FORWARD",stringbuffer_get(stringbuf));
+		
+	}
+	stringbuffer_destroy(stringbuf);
+}
+/*
+ * vpn_passthrough
+ */
+static void vpn_passthrough(event_t* ev,const msg_t* m)
+{
+	int gre;
+	int l2tp;
+	int pppoe;
+	int ipsec;
+	int pptp;
+	
+	nfc_dbg("\n");
+	gre   = atoi(msg_content_at_frame(m,1));
+	l2tp  = atoi(msg_content_at_frame(m,2));
+	pppoe = atoi(msg_content_at_frame(m,3));
+	ipsec = atoi(msg_content_at_frame(m,4));
+	pptp  = atoi(msg_content_at_frame(m,5));
+
+	del_rule_by_event(ev);
+	if(gre){
+		add_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
+	}
+	if(l2tp){
+		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 1701 -j DROP");
+	}
+	if(pptp){
+		add_rule(ev,"iptables","filter","FORWARD","-p tcp --dport 1723 -j DROP");
+		add_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
+	}
+	if(pppoe){
+		/* TODO */
+	}
+	if(ipsec){
+		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 500 -j DROP");
+		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 4500 -j DROP");
+	}
+}
+/*
+ * multicast filter
+ */
+static void multicast_filter(event_t* ev,const msg_t* m)
+{
+	int i;
+	int num;
+	const char* interface;	
+	nfc_dbg("\n");
+	num = atoi( msg_content_at_frame(m,1) );
+
+	del_rule_by_event(ev);
+	for(i = 0 ;i <num ; i++){
+		interface = msg_content_at_frame(m,2+i);
+		add_rule(ev,"iptables", "raw", "PREROUTING","-i %s -m pkttype --pkt-type multicast -j DROP",interface);
+		add_rule(ev,"iptables", "raw", "OUTPUT","-o %s -m pkttype --pkt-type multicast -j DROP",interface);
+	}
+}
+
+/*
+ * packet filter
+ * filter packets by l2 l3 l4 header
+ */
+static void packet_filter(event_t* ev,const msg_t* m)
+{
+	int i,num;
+	const char* action;
+	const char* interface;
+	const char* protocol;
+	const char* source_ip;
+	const char* source_mask;
+	const char* destination_ip;
+	const char* destination_mask;
+	const char* source_starting_port;
+	const char* source_ending_port;
+	const char* destination_starting_port;
+	const char* destination_ending_port;
+	stringbuffer_t* buf;
+	nfc_dbg("\n");
+	del_rule_by_event(ev);
+	buf = stringbuffer_alloc();
+	if(!buf){
+		nfc_dbg("stringbuffer_alloc fails\n");
+		return;	
+	}
+	num = atoi( msg_content_at_frame(m,1));
+	for(i = 0 ;i <num; i++){
+
+		stringbuffer_clear(buf);
+
+		action    		 = msg_content_at_frame(m,2+11*i);
+		interface 		 = msg_content_at_frame(m,3+11*i);
+		protocol  		 = msg_content_at_frame(m,4+11*i);
+		source_ip 		 = msg_content_at_frame(m,5+11*i);
+		source_mask 		 = msg_content_at_frame(m,6+11*i);
+		destination_ip 		 = msg_content_at_frame(m,7+11*i);
+		destination_mask 	 = msg_content_at_frame(m,8+11*i);
+		source_starting_port 	 = msg_content_at_frame(m,9+11*i);
+		source_ending_port 	 = msg_content_at_frame(m,10+11*i);
+		destination_starting_port= msg_content_at_frame(m,11+11*i);
+		destination_ending_port  = msg_content_at_frame(m,12+11*i);
+		
+		stringbuffer_add_f(buf,"-i %s -p %s ",interface,protocol);
+		if(strcmp(source_ip,"none")){
+			stringbuffer_add_f(buf,"-s %s/%s ",source_ip,source_mask);
+		}
+		if(strcmp(destination_ip,"none")){
+			stringbuffer_add_f(buf,"-d %s/%s ",destination_ip,destination_mask);
+		}
+		if(strcmp(source_starting_port,"none")){
+			stringbuffer_add_f(buf,"--sport %s:%s ",source_starting_port,source_ending_port);
+		}
+		if(strcmp(destination_starting_port,"none")){
+			stringbuffer_add_f(buf,"--dport %s:%s ",destination_starting_port,destination_ending_port);
+		}
+		add_rule(ev,"iptables","raw","PREROUTING",stringbuffer_get(buf));
+	}
+	stringbuffer_destroy(buf);
 }

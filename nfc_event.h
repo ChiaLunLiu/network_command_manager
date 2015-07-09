@@ -1,6 +1,7 @@
 #ifndef __NFC_EVENT_H__
 #define __NFC_EVENT_H__
 #include "stringbuffer.h"
+#include "util.h"
 #include <minimsg/minimsg.h>
 #include <limits.h>
 
@@ -34,12 +35,6 @@
 struct _event;
 typedef struct _event event_t;
 
-typedef struct _timer_data{
-	int fd;
-	event_t* ev;
-	msg_t* m;
-	
-}timer_data_t;
 
 typedef struct _event_info{
 	const char* event_name;
@@ -52,12 +47,12 @@ typedef struct _network_function_center{
 	/* element is of type (event_t*,number of rule in the table) */
 	list_t* chain[MAX_CHAIN];
 	list_t*	list_other_rule;	/* keep ip, route cmd */
-	list_t* list_timer; /* element is of type (timerfd, event_t*, msg_t* m) */	
 	int id_pool; /* only increase , assume that it won't overflow */
-	int efd; /* epoll fd */
+	void* base; /* libevent base */
 }nfc_t;
 
 struct _event{
+	void* priv; /* event specific pointer */	
 	stringbuffer_t *del_cmd ; /* buffer for event to use */
 	const event_info_t* info;
 	nfc_t* center;
@@ -81,18 +76,7 @@ void nfc_free(nfc_t* center);
 void nfc_msg_process(nfc_t* center,msg_t* m);
 
 
-/* event */
-/* APP */
-void app_dhcp(event_t* arg);
-void app_dns(event_t* arg);
-void app_ntp(event_t* arg);
-void app_http(event_t *arg);
-void app_https(event_t* arg);
-void app_telnet(event_t* arg);
-void app_upnp(event_t*arg);
-void app_voip(event_t* arg);
 
-void dmz(event_t* arg);
 #endif
 
 
