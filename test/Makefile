@@ -1,5 +1,5 @@
-test_buf:
-	gcc -I../ test_buffer.c ../stringbuffer.c ../util.c -O2
+all:
+	gcc -I.. client.c -O2 -o client -lminimsg -lnfc
 clean:
-	rm a.out
+	rm -f client
 
