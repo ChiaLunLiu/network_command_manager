@@ -27,14 +27,11 @@ void stringbuffer_add(stringbuffer_t* b, const char* data)
 {
 	int len = strlen(data);
 	
-	printf("%d\n",b->max_size);
 	if(b->max_size - b->current_size <= len){
 		while(b->max_size - b->current_size <= len){
 			b->max_size*=2;
-//			printf("%d\n",b->max_size);
 		}
 			b->buf = realloc( b->buf, b->max_size);
-	//		printf("done");
 	}
 	
 	memcpy(b->buf + b->current_size, data, len);

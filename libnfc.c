@@ -51,24 +51,6 @@ msg_t* nfc_ip_passthrough(const char* op)
 	msg_append_string(m,op);
 	return m;
 }
-msg_t* nfc_data_channel_setup(int op, int should_broute, int table_id, const char* ims_ip, const char* gw_ip,const char* interface_name, const char* ip, int number_of_dns, char** dns_ip)
-{
-	int i;
-	msg_t* m;
-	m = msg_alloc();
-	if(!m) return NULL;
-	msg_append_string(m,"data channel setup");
-	msg_append_string_f(m,"%d",op);	
-	msg_append_string_f(m,"%d",should_broute);	
-	msg_append_string_f(m,"%d",table_id);
-	msg_append_string(m,ims_ip);	
-	msg_append_string(m,gw_ip);
-	msg_append_string(m,interface_name);	
-	msg_append_string(m,ip);	
-	msg_append_string_f(m,"%d",number_of_dns);	
-	for(i = 0 ;i < number_of_dns ; i++) msg_append_string(m,dns_ip[i]);	
-	return m;
-}
 msg_t* nfc_vpn_passthrough(int gre,int l2tp,int pppoe,int ipsec, int pptp)
 {
 	msg_t* m;
@@ -308,4 +290,87 @@ msg_t* nfc_port_trigger(int number_of_rule, const char** wan_interfaces, const c
 		msg_append_string(m,lan_ending_port[i]);
 	}
 	return m;	
+}
+msg_t* nfc_port_forwarding(int number_of_rule,const char** interface, const char** wan_port, const char** lan_ip,const char** lan_port)
+{
+	int i;
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"port forwarding");
+	msg_append_string_f(m,"%d",number_of_rule);
+	for(i = 0;i<number_of_rule;i++){
+		msg_append_string(m,interface[i]);
+		msg_append_string(m,wan_port[i]);
+		msg_append_string(m,lan_ip[i]);
+		msg_append_string(m,lan_port[i]);
+	}
+	return m;	
+}
+msg_t* nfc_dmz(int number_of_rule, const char** interfaces, const char** ip)
+{
+	int i;
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"dmz");
+	msg_append_string_f(m,"%d",number_of_rule);
+	for(i = 0;i<number_of_rule;i++){
+		msg_append_string(m,interfaces[i]);
+		msg_append_string(m,ip[i]);
+	}
+	return m;
+}
+msg_t* nfc_data_channel_setup(int enable,int should_broute,int table_id,const char* ims_ip, const char* gw_ip, const char* data_incoming_interface, const char* interface, const char* interface_ip,int number_of_dns, const char** dns_ip)
+{
+	int i;
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"data channel setup");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string_f(m,"%d",should_broute);
+	msg_append_string_f(m,"%d",table_id);
+	msg_append_string(m,ims_ip);
+	msg_append_string(m,gw_ip);
+	msg_append_string(m,data_incoming_interface);
+	msg_append_string(m,interface);
+	msg_append_string(m,interface_ip);
+	msg_append_string_f(m,"%d",number_of_dns);
+
+	for(i = 0;i<number_of_dns;i++){
+		msg_append_string(m,dns_ip[i]);
+	}	
+	return m;
+}
+msg_t* nfc_snat(int enable,int id,const char* interface)
+{
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"snat");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string_f(m,"%d",id);
+	msg_append_string(m,interface);
+	return m;	
+}
+msg_t* nfc_interface_basic_setup(int enable, int cid, int should_broute,const char* routing_table_id,const char* ims_ip, const char* gw_ip, const char* interface, const char* interface_ip, int number_of_dns, const char** dns_ip)
+{
+	int i;
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"lte interface basic setup");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string_f(m,"%d",cid);
+	msg_append_string_f(m,"%d",should_broute);
+	msg_append_string(m,routing_table_id);
+	msg_append_string(m,ims_ip);
+	msg_append_string(m,gw_ip);
+	msg_append_string(m,interface);
+	msg_append_string(m,interface_ip);
+	msg_append_string_f(m,"%d",number_of_dns);
+	for(i = 0 ;i < number_of_dns ; i++)msg_append_string(m,dns_ip[i]);
+	return m;
+	
 }

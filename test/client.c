@@ -64,6 +64,13 @@ void test_https_set(int sock);
 void test_https_clear(int sock);
 void test_port_trigger_set(int sock);
 void test_port_trigger_clear(int sock);
+void test_port_forwarding_set(int sock);
+void test_port_forwarding_clear(int sock);
+void test_dmz_set(int sock);
+void test_dmz_clear(int sock);
+void test_data_channel_setup_set(int sock);
+void test_snat(int sock);
+void test_interface_basic_setup(int sock); 
 void print_help()
 {
 	printf("["SPACING"]: network_mode, radio_interface_name, radio_interface_vendor, number_of_ether_interface"
@@ -349,6 +356,93 @@ void test_port_trigger_set(int sock)
 	m =nfc_port_trigger(2,wan_interfaces, lan_interfaces, wan_starting_port, wan_ending_port, lan_starting_port, lan_ending_port);
 	msg_send(sock,m);
 }
+void test_port_forwarding_set(int sock)
+{
+	msg_t* m;
+	const char* interface[]={"eth1","eth3"};
+	const char* wan_port[]={"40000","30000"};
+	const char* lan_ip[]={"1.1.1.1","2.2.2.2"};
+	const char* lan_port[]={"5000","6000"};
+	m =nfc_port_forwarding(2,interface,wan_port,lan_ip,lan_port);
+	msg_send(sock,m);
+}
+void test_port_forwarding_clear(int sock)
+{
+	msg_t* m;
+	m =nfc_port_forwarding(0,NULL,NULL,NULL,NULL);
+	msg_send(sock,m);
+
+}
+void test_dmz_set(int sock)
+{
+	msg_t* m;
+	const char* interfaces[]={"eth2","eth3"};
+	const char* ip[]={"1.1.1.1","2.2.2.2"};
+	m = nfc_dmz(2,interfaces,ip);
+	msg_send(sock,m);
+}
+void test_dmz_clear(int sock)
+{
+	msg_t* m;
+	const char* interfaces[]={"eth2","eth3"};
+	const char* ip[]={"1.1.1.1","2.2.2.2"};
+	m = nfc_dmz(0,interfaces,ip);
+	msg_send(sock,m);
+}
+void test_data_channel_setup_set(int sock)
+{
+	int enable=1;
+	int should_broute=1;
+	int table_id=2;
+	const char* ims_ip="1.1.1.1";
+	const char* gw_ip="2.2.2.2";
+	const char* data_subnet="5.5.5.0/24";
+	const char* interface="eth2";
+	const char* interface_ip="2.2.2.3";
+	int number_of_dns=2;
+	const char* dns_ip[]={"8.8.8.8","7.7.7.7"};
+
+	msg_t* m;
+	m = nfc_data_channel_setup(enable,should_broute,table_id,ims_ip,gw_ip,data_subnet,interface,interface_ip,
+	number_of_dns,dns_ip);
+	msg_send(sock,m);
+}
+void test_snat(int sock)
+{
+	printf("%s\n",__func__);
+	msg_t* m;
+	m = nfc_snat(1,2,"eth4");
+	msg_send(sock,m);
+	m = nfc_snat(1,3,"eth5");
+	msg_send(sock,m);
+	m = nfc_snat(0,2,"");
+	msg_send(sock,m);
+	m = nfc_snat(0,3,"");
+	msg_send(sock,m);
+	
+}
+void test_interface_basic_setup(int sock)
+{
+	int enable = 1;
+	int cid = 2;
+	int should_broute = 1;
+	const char* routing_table_id = "2";
+	const char* ims_ip = "7.7.7.7";
+	const char* gw_ip = "10.10.10.1";
+	const char* interface = "eth2";
+	const char* interface_ip = "10.10.10.2";
+	int number_of_dns = 2;
+	const char* dns[]={"8.8.8.8","10.10.10.10"};
+	
+	
+	printf("%s\n",__func__);
+	msg_t* m;
+	m = nfc_interface_basic_setup(enable,cid,should_broute,routing_table_id,ims_ip,gw_ip,interface,interface_ip,number_of_dns,dns);
+	msg_send(sock,m);
+	m = nfc_interface_basic_setup(0,cid,should_broute,routing_table_id,ims_ip,gw_ip,interface,interface_ip,number_of_dns,dns);
+	msg_send(sock,m);
+	
+}
 int main(int argc,char** argv)
 {
 	int sock;
@@ -447,6 +541,16 @@ int main(int argc,char** argv)
 	test_https_clear(sock);
 	test_port_trigger_set(sock);
 	
+	test_port_forwarding_set(sock);
+	test_port_forwarding_clear(sock);
+	test_dmz_set(sock);
+	test_dmz_clear(sock);
+	test_data_channel_setup_set(sock);
+
+	test_snat(sock);
+	test_interface_basic_setup(sock);
+
+
 	close(sock);	
 	return 0;
 }

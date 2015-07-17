@@ -60,6 +60,8 @@ static void port_forwarding(event_t* ev,const msg_t* m);
 static void vlan_tagging(event_t* ev,const msg_t* m);
 static void static_routing(event_t* ev,const msg_t* m);
 static void mss_clamping(event_t* ev,const msg_t* m);
+static void snat(event_t* ev,const msg_t* m);
+static void lte_interface_basic_setup(event_t* ev,const msg_t* m);
 
 static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 
@@ -102,6 +104,8 @@ static const event_info_t event_info[]={
 {"static routing",static_routing,  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
 {"mss_clamping",mss_clamping,  				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,-1,0,0,0,0} },
 {"mgmt channel setup",mgmt_channel_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"snat",snat,						{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"lte interface basic setup",lte_interface_basic_setup,	{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
 };
 
 str_int_pair_t chain_mapping[]={
@@ -131,11 +135,16 @@ str_int_pair_t chain_mapping[]={
 static event_t * event_search(nfc_t* center,const char* name);
 
 static int chain_str_to_int(const char* tool,const char* table, const char* chain);
-static int add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
-static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...);
+static int add_ip_rule(event_t* ev,const char* tool,const char *format, ...);
+static void add_ip_rule_and_id(event_t* ev,int id,const char* tool,const char *format, ...);
+static int _add_ip_rule_and_id(event_t* ev,int id,const char* tool,const char *format, va_list in_argptr);
+
+static int  add_netfilter_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
+static void  add_netfilter_rule_and_id(event_t* ev,int id,const char* tool, const char* table, const char* chain, const char *format, ...);
+static int  _add_netfilter_rule_and_id(event_t* ev,int id,const char* tool, const char* table, const char* chain, const char *format, va_list in_argptr);
+
+static void del_rule_by_id(event_t* ev,int id);
 static void del_rule_by_event(event_t* ev);
-static void del_rule_by_id(nfc_t* center,int id);
-static int  add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...);
 
 void show_all_rule(const nfc_t* center);
 
@@ -185,9 +194,9 @@ void show_all_rule(const nfc_t* center)
  * delete iptables, ebtables rule by id
  *
  */
-static void del_rule_by_id(nfc_t* center,int id)
+static void del_rule_by_id(event_t* ev,int id)
 {
-	
+	nfc_t* center;
 	list_t* list;
 	list_iterator_t* it;
 	list_node_t* prev, * ln;
@@ -195,8 +204,10 @@ static void del_rule_by_id(nfc_t* center,int id)
 	del_rule_t* r;
 	int i;
 	int j;
-	int dummy=0;
+	int dummy = 0;
+	int has_deleted=0;
 	nfc_dbg("\n");
+	center = ev->center;
 	/* chain[i] keeps iptables, ebtables del cmd */
 	for(i=0;i< MAX_CHAIN ; i++){
     		it = list_iterator_new(center->chain[i], LIST_HEAD);
@@ -204,13 +215,13 @@ static void del_rule_by_id(nfc_t* center,int id)
     		while(prev){
 			ln = list_iterator_next(it);
 			r = (del_rule_t*) prev->val;
-			if( r->id == id){
+			if( r->id == id && r->ev == ev){
 				list_remove(center->chain[i],prev);
 				cmd = stringbuffer_get(r->del_cmd);
 				nfc_dbg("delete rule: %s\n",cmd);
 				dummy=system(cmd);
 				del_rule_free(r);
-				dummy = 1;
+				has_deleted++;
 			}
 			prev = ln;
 		}
@@ -223,20 +234,21 @@ static void del_rule_by_id(nfc_t* center,int id)
     	while(prev){
 		ln = list_iterator_next(it);
 		r = (del_rule_t*) prev->val;
-		if( r->id == id){
+		if( r->id == id && r->ev == ev){
 			list_remove(center->list_other_rule,prev);
 			cmd = stringbuffer_get(r->del_cmd);
 			nfc_dbg("delete rule: %s\n",cmd);
 			dummy=system(cmd);
 			del_rule_free(r);
-			dummy = 1;
+			has_deleted++;
 		}
 		prev= ln;
 	}
     	list_iterator_destroy(it);
 	
 	
-	if(dummy==0) nfc_dbg("delete noting\n");
+	if(has_deleted == 0) nfc_dbg("delete noting\n");
+	else nfc_dbg("delete %d rules\n", has_deleted);
 }
 /*
  * del_rule_by_event
@@ -298,7 +310,24 @@ static void del_rule_by_event(event_t* ev)
     	list_iterator_destroy(it);
 
 }
-static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...)
+static int add_ip_rule(event_t* ev,const char* tool,const char *format, ...)
+{
+	int id;
+	va_list argptr;
+	va_start (argptr, format);
+	id =_add_ip_rule_and_id(ev,-1,tool,format, argptr);
+	va_end (argptr);
+	return id;
+}
+static void add_ip_rule_and_id(event_t* ev,int id,const char* tool,const char *format, ...)
+{
+	int dummy;
+	va_list argptr;
+	va_start (argptr, format);
+	dummy = _add_ip_rule_and_id(ev,id,tool,format, argptr);
+	va_end (argptr);
+}
+static int _add_ip_rule_and_id(event_t* ev,int id,const char* tool,const char *format, va_list in_argptr)
 {
 	char* string;
 	va_list argptr;
@@ -308,20 +337,43 @@ static void add_ip_rule(event_t* ev,const char* tool,const char *format, ...)
 	r = del_rule_alloc();
 	ln = list_node_new(r);
 	if(!ln) nfc_handle_error("list_node_new");
-	
-	r->id = ev->center->id_pool++;
+	if(id == -1) r->id = (ev->id_pool++);
+	else   r->id = id;
 	r->ev = ev;
-    	va_start (argptr, format);
+    	va_copy (argptr, in_argptr);
     	string = zsys_vprintf (format, argptr);
     	va_end (argptr);
 	if(!string) nfc_handle_error("null string");
+	nfc_dbg("ip %s add %s\n",tool,string);
 	systemf("ip %s add %s",tool,string);
 	
     	stringbuffer_add_f(r->del_cmd,"ip %s del %s",tool,string);
 	list_rpush(ev->center->list_other_rule,ln);
+	free(string);
+	return r->id;
 
 }
-static int  add_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...)
+
+static int add_netfilter_rule(event_t* ev,const char* tool, const char* table, const char* chain, const char *format, ...)
+{
+    int id;
+    va_list argptr;
+    va_start (argptr, format);
+    id =_add_netfilter_rule_and_id(ev,-1,tool,table,chain,format, argptr);
+    va_end (argptr);
+    return id;
+}
+
+static void add_netfilter_rule_and_id(event_t* ev,int id,const char* tool, const char* table, const char* chain, const char *format, ...)
+{
+    int dummy;
+    va_list argptr;
+    va_start (argptr, format);
+    dummy = _add_netfilter_rule_and_id(ev,id,tool,table,chain,format, argptr);
+    va_end (argptr);
+	
+}
+static int  _add_netfilter_rule_and_id(event_t* ev,int id,const char* tool, const char* table, const char* chain, const char *format,  va_list in_argptr)
 {
 	va_list argptr;
 	unsigned i;
@@ -341,9 +393,8 @@ static int  add_rule(event_t* ev,const char* tool, const char* table, const char
 
     	center = ev->center;
 	dr = del_rule_alloc();
-	
-
-    	va_start (argptr, format);
+	if(!dr) nfc_handle_error("del_rule_alloc");
+    	va_copy (argptr, in_argptr);
     		string = zsys_vprintf (format, argptr);
     	va_end (argptr);
     	if(!string) nfc_handle_error("rules_changed");
@@ -389,10 +440,11 @@ static int  add_rule(event_t* ev,const char* tool, const char* table, const char
 
     	stringbuffer_add_f(dr->del_cmd,"%s -t %s -D %s %s",tool,table,chain,string);
 	dr->ev = ev;	
-	dr->id = (center->id_pool++);
+	if(id == -1) dr->id = (ev->id_pool++);
+	else         dr->id = id;
     	free(string);
+	return id;
 
-	return dr->id;
 }
 nfc_t* nfc_create()
 {
@@ -416,7 +468,6 @@ nfc_t* nfc_create()
 	
 	if(!center->base)nfc_handle_error("event_base_new");
 
-	center->id_pool = 0;	
 	for(i = 0 ;i < MAX_CHAIN;i++){
 		center->chain[i] = list_new();
 		if(!center->chain[i]) nfc_handle_error("list_new");
@@ -431,6 +482,7 @@ nfc_t* nfc_create()
 		if(!ev->del_cmd) nfc_handle_error("stringbuffer_create fails\n");
         	ev->center = center;
         	ev->info = &event_info[i];
+		ev->id_pool = 1024;
         	ln = list_node_new(ev);
         	if(!ln) nfc_handle_error("list_node_new");
         	list_rpush(center->list_event,ln);
@@ -528,14 +580,14 @@ void mode_setup(event_t* ev, const msg_t* m)
 	radio_interface = msg_content_at_frame(m,2);
 	
 	if(!strcmp(network_mode,"NAT")){
-		add_rule(ev,"iptables","nat","POSTROUTING","-o %s -j MASQUERADE",radio_interface);
+		add_netfilter_rule(ev,"iptables","nat","POSTROUTING","-o %s -j MASQUERADE",radio_interface);
 	}
 	else if(!strcmp(network_mode,"BRIDGE")){
 	
 		vendor = msg_content_at_frame(m,3);
 		/* SQN THP packet */
 		if(!strcmp(vendor,"sqn")) 
-			add_rule(ev,"ebtables","broute","BROUTING","-i %s --dst 00:16:08:ff:00:01 -j DROP",radio_interface);
+			add_netfilter_rule(ev,"ebtables","broute","BROUTING","-i %s --dst 00:16:08:ff:00:01 -j DROP",radio_interface);
 	}
 }
 
@@ -562,7 +614,7 @@ static void nat(event_t* ev,const msg_t* m)
 	for(i=0;i<num;i++){
 		interface = msg_content_at_frame(m,2+i);
 		nfc_dbg("interface: %s\n",interface);
-		add_rule(ev,"iptables","nat","PREROUTING","-o %s -j MASQUERADE",interface);	
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-o %s -j MASQUERADE",interface);	
 	}
 }
 
@@ -594,70 +646,60 @@ static void ip_passthrough(event_t* ev,const msg_t* m)
 }
 static void data_channel_setup(event_t* ev,const msg_t* m)
 {
-	const char* data_incoming_interface;
-	const char* data_outgoing_interface;
-	const char* op;
-	const char* ims;
-	const char* dns;
-	const char* ip;
-	const char* gw;
-	int dns_num;
-	int num;
-	int i,cid;
+/*	int enable;
 	int should_broute;
-	dbg("\n");
-	/* frame number checking */
-	num = msg_number_of_frame(m);
-	if(num < 2){
-		nfc_dbg("early return due to frame < 2\n");
-		return;
-	}
-
-	op = msg_content_at_frame(m,1);
+	int table_id;
+	const char* ims;
+	const char* gw;
+	const char* data_incoming_interface;
+	int number_of_route;
+	const char* data_route;
+	const char* data_interface;
+	const char* data_interface_ip;
+	int dns_num;
+	const char* dns;
+	int i;
+	nfc_dbg("\n");
 
 	del_rule_by_event(ev);
 
-	if(!strcmp(op,"0")){
+	enable = atoi(msg_content_at_frame(m,1));
+
+	if(!enable){
 		return ;
 	}
 
-	if(num <=9 ){
-		nfc_dbg("early return due to frames <= 9\n");
-		return;
-	}
-	dns_num = atoi(msg_content_at_frame(m,9));
 	
-	if(num != dns_num + 10){
-		nfc_dbg("early return due to inconsistent frame (%d,%d)\n",num,dns_num+10);
-		return;
-	}
-	data_incoming_interface = msg_content_at_frame(m,2);
-	should_broute = atoi( msg_content_at_frame(m,3));
-	cid = atoi(msg_content_at_frame(m,4));
-	ims = msg_content_at_frame(m,5);
-	gw =  msg_content_at_frame(m,6);
+	should_broute = atoi( msg_content_at_frame(m,2));
+	table_id = atoi(msg_content_at_frame(m,3));
+	ims = msg_content_at_frame(m,4);
+	gw =  msg_content_at_frame(m,5);
+	data_incoming_interface = msg_content_at_frame(m,6);
 	data_outgoing_interface = msg_content_at_frame(m,7);
 	ip =  msg_content_at_frame(m,8);
+	dns_num = atoi(msg_content_at_frame(m,9));
+	nfc_dbg("cid = %d\n",cid);
+*/
 	/* policy routing */
 	/* ims */
-	if(strcmp(ims,"")) add_ip_rule(ev,"rule","from `getnet %s` to %s table %d;\n",data_incoming_interface,ims,cid);
+//	if(strcmp(ims,"")) add_ip_rule(ev,"rule","to %s table %d",ims,cid);
 	/* dns */
-	for(i=0;i<dns_num;i++){
-		dns = msg_content_at_frame(m,8+i);
-		add_ip_rule(ev,"rule","from `getnet %s` to %s table %d;\n",data_incoming_interface,dns,cid);
-	}
+//	for(i=0;i<dns_num;i++){
+//		dns = msg_content_at_frame(m,10+i);
+//		add_ip_rule(ev,"rule","to %s table %d",dns,cid);
+//	}
 	/* data */
-	add_ip_rule(ev,"rule","iif %s table %d;\n",data_incoming_interface,cid);
-	add_ip_rule(ev,"rule","iif %s table %d;\n",data_outgoing_interface,cid);
+//	add_ip_rule(ev,"rule","iif %s table %d",data_incoming_interface,cid);
+//	add_ip_rule(ev,"rule","iif %s table %d",data_outgoing_interface,cid);
 	/* local with IP bound to data interface */
-	add_ip_rule(ev,"rule","from %s table %d;\n",ip,cid);
+//	add_ip_rule(ev,"rule","from %s table %d",ip,cid);
 
 	/* routing rule */
-	add_ip_rule(ev,"route","`getnet %s` dev %s table %d;\n",data_incoming_interface,data_incoming_interface,cid);
-	add_ip_rule(ev,"route","default via  %s dev %s table %d;\n",gw,data_outgoing_interface,cid);
+//	add_ip_rule(ev,"route","`getnet %s` dev %s table %d",data_incoming_interface,data_incoming_interface,cid);
+//	add_ip_rule(ev,"route","default via  %s dev %s table %d",gw,data_outgoing_interface,cid);
 	
 	/* broute */
-	if(should_broute) add_rule(ev,"broute","BROUTING","-i %s -j DROP;\n",data_outgoing_interface);
+//	if(should_broute) add_netfilter_rule(ev,"broute","BROUTING","-i %s -j DROP",data_outgoing_interface);
 		
 	
 }
@@ -730,9 +772,9 @@ static void voice_channel_setup(event_t* ev,const msg_t* m)
 	add_ip_rule(ev,"route","default via  %s dev %s table %d;\n",gw,voice_outgoing_interface,cid);
 	
 	/* broute */
-	if(should_broute) add_rule(ev,"broute","BROUTING","-i %s -j DROP;\n",voice_outgoing_interface);
+	if(should_broute) add_netfilter_rule(ev,"broute","BROUTING","-i %s -j DROP;\n",voice_outgoing_interface);
 	/* handle non-onboard voice pkt */
-	add_rule(ev,"mangle","PREROUTING","-i %s -p udp --sport %d -j NFQUEUE --queue-num 1;\n",voice_outgoing_interface,sip_server_port);
+	add_netfilter_rule(ev,"mangle","PREROUTING","-i %s -p udp --sport %d -j NFQUEUE --queue-num 1;\n",voice_outgoing_interface,sip_server_port);
 }
 /* TODO 
  * set dscp-target ACCEPT
@@ -747,7 +789,7 @@ static void mgmt_dscp(event_t* ev,const msg_t* m)
 	enable	  = atoi(msg_content_at_frame(m,1));
 	dscp_value= msg_content_at_frame(m,2);
 	interface = msg_content_at_frame(m,3);
-	if(enable) add_rule(ev,"iptables","mangle","OUTPUT","-o %s -j DSCP --set-dscp %s",interface,dscp_value);
+	if(enable) add_netfilter_rule(ev,"iptables","mangle","OUTPUT","-o %s -j DSCP --set-dscp %s",interface,dscp_value);
 	
 }
 /* TODO 
@@ -763,7 +805,7 @@ static void data_dscp(event_t* ev,const msg_t* m)
 	enable	  = atoi(msg_content_at_frame(m,1));
 	dscp_value= msg_content_at_frame(m,2);
 	interface = msg_content_at_frame(m,3);
-	if(enable) add_rule(ev,"iptables","mangle","FORWARD","-o %s -j DSCP --set-dscp %s",interface,dscp_value);
+	if(enable) add_netfilter_rule(ev,"iptables","mangle","FORWARD","-o %s -j DSCP --set-dscp %s",interface,dscp_value);
 	
 }
 /*
@@ -803,16 +845,16 @@ static void voice_dscp(event_t* ev,const msg_t* m)
 	pattern_ending_port 	= msg_content_at_frame(m,11);
 
 	if(sip_dscp_enable){
-		add_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s --dport 5060 -j DSCP --set-dscp %s",
+		add_netfilter_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s --dport 5060 -j DSCP --set-dscp %s",
 		interface,sip_protocol,sip_dscp_value);
 	}
 	if(rtp_rtcp_dscp_enable){
 		if(use_pattern_for_rtp_rtcp){
-			add_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s -d %s --dport %s:%s -j DSCP --set-dscp %s",
+			add_netfilter_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s -d %s --dport %s:%s -j DSCP --set-dscp %s",
 			interface,pattern_protocol, pattern_ip, pattern_starting_port, pattern_ending_port,rtp_rtcp_dscp_value);
 		}
 		else{
-			add_rule(ev,"iptables","mangle","FORWARD","-i %s -p %s --sport 5060 -j NFQUEUE --queue-num 0",
+			add_netfilter_rule(ev,"iptables","mangle","FORWARD","-i %s -p %s --sport 5060 -j NFQUEUE --queue-num 0",
 			interface,sip_protocol);
 		}
 	}
@@ -843,7 +885,7 @@ static void dscp_timeout_callback(int fd, short event, void *arg)
 
 	nfc_dbg("id = %d\n",rule_id);
 	nfc_dbg("timer event : %p\n",timer_event);
-	del_rule_by_id(center,rule_id);
+	del_rule_by_id(ev,rule_id);
 	/*find the timer and  remove from list*/
 	it = list_iterator_new((list_t*) ev->priv, LIST_HEAD);
         while(ln = list_iterator_next(it)){
@@ -929,7 +971,7 @@ static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m)
 	}
 	else{
 		nfc_dbg("create new timer event\n");
-		rule_id = add_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s -d %s --dport %s -j DSCP --set-dscp %s",interface,protocol,media_ip,media_port,dscp_value);
+		rule_id = add_netfilter_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s -d %s --dport %s -j DSCP --set-dscp %s",interface,protocol,media_ip,media_port,dscp_value);
 		nfc_dbg("rule id : %d\n",rule_id);
 		/* record timer_event by media ip and port */
 		m_mapping = msg_alloc();
@@ -980,13 +1022,13 @@ static void dmz(event_t* ev,const msg_t* m)
 	msg_t* tmp_m;
 	nfc_dbg("\n");
 	num = atoi(msg_content_at_frame(m,1));
-	interface = msg_content_at_frame(m,2);
-	lan_ip = msg_content_at_frame(m,3);
 
 	del_rule_by_event(ev);
 	
 	for(i = 0 ;i <num ; i++){
-		 add_rule(ev,"nat","PREROUTING","-i %s -j DNAT --to %s",interface,lan_ip); 	
+		interface = msg_content_at_frame(m,2+2*i);
+		lan_ip = msg_content_at_frame(m,3+2*i);
+		 add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -j DNAT --to %s",interface,lan_ip); 	
 	}
 	
 }
@@ -1012,8 +1054,8 @@ static void udhcpc(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 68 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 68 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 68 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p udp --dport 68 -j ACCEPT");
 	
 
 }
@@ -1029,8 +1071,8 @@ static void ntp(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 123 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 123 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 123 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p udp --dport 123 -j ACCEPT");
 	
 }
 /*
@@ -1045,10 +1087,10 @@ static void oma(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 2948 -j ACCEPT");
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 7547 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 2948 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 7547 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 2948 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 7547 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p udp --dport 2948 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport 7547 -j ACCEPT");
 }
 /*
  * acs
@@ -1062,8 +1104,8 @@ static void acs(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 58603 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 58603 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 58603 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport 58603 -j ACCEPT");
 }
 /*
  * snmp
@@ -1077,8 +1119,8 @@ static void snmp(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 161 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 161 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 161 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p udp --dport 161 -j ACCEPT");
 }
 /*
  * dns
@@ -1092,10 +1134,10 @@ static void dns(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 53 -j ACCEPT");
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 53 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p udp --dport 53 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 53 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p udp --dport 53 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 53 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p udp --dport 53 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport 53 -j ACCEPT");
 }
 /*
  * telnet
@@ -1115,8 +1157,8 @@ static void telnet(event_t* ev,const msg_t* m)
 
 	for(i = 0 ;i<num ; i++){
 		interface = msg_content_at_frame(m,3+i);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport 23 -j ACCEPT",interface);
-		add_rule(ev,"iptables","filter","INPUT","-i %s -p tcp --dport 23 -j ACCEPT",interface);
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport 23 -j ACCEPT",interface);
+		add_netfilter_rule(ev,"iptables","filter","INPUT","-i %s -p tcp --dport 23 -j ACCEPT",interface);
 	}
 }
 /*
@@ -1131,10 +1173,10 @@ static void upnp(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 49152 -j ACCEPT");
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 1900 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 49152 -j ACCEPT");
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport 1900 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 49152 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport 1900 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport 49152 -j ACCEPT");
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport 1900 -j ACCEPT");
 }
 /*
  * pots
@@ -1158,8 +1200,8 @@ static void http(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport %s -j ACCEPT",port);
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport %s -j ACCEPT",port);
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport %s -j ACCEPT",port);
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport %s -j ACCEPT",port);
 }
 /*
  * https
@@ -1175,8 +1217,8 @@ static void https(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);	
 	if(!enable) return;
 
-	add_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport %s -j ACCEPT",port);
-	add_rule(ev,"iptables","filter","INPUT","-p tcp --dport %s -j ACCEPT",port);
+	add_netfilter_rule(ev,"iptables","nat","PREROUTING","-p tcp --dport %s -j ACCEPT",port);
+	add_netfilter_rule(ev,"iptables","filter","INPUT","-p tcp --dport %s -j ACCEPT",port);
 
 }
 /*
@@ -1230,7 +1272,7 @@ static void access_restriction(event_t* ev,const msg_t* m)
 		if(strcmp(blocked_keyword,"none")){
 			stringbuffer_add_f(stringbuf,"-m string --algo bm --string %s ",blocked_keyword);
 		}	
-		add_rule(ev,"iptables","filter","FORWARD",stringbuffer_get(stringbuf));
+		add_netfilter_rule(ev,"iptables","filter","FORWARD",stringbuffer_get(stringbuf));
 		
 	}
 	stringbuffer_destroy(stringbuf);
@@ -1255,21 +1297,21 @@ static void vpn_passthrough(event_t* ev,const msg_t* m)
 
 	del_rule_by_event(ev);
 	if(gre){
-		add_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
 	}
 	if(l2tp){
-		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 1701 -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p udp --dport 1701 -j DROP");
 	}
 	if(pptp){
-		add_rule(ev,"iptables","filter","FORWARD","-p tcp --dport 1723 -j DROP");
-		add_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p tcp --dport 1723 -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p gre -j DROP");
 	}
 	if(pppoe){
 		/* TODO */
 	}
 	if(ipsec){
-		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 500 -j DROP");
-		add_rule(ev,"iptables","filter","FORWARD","-p udp --dport 4500 -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p udp --dport 500 -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-p udp --dport 4500 -j DROP");
 	}
 }
 /*
@@ -1286,8 +1328,8 @@ static void multicast_filter(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);
 	for(i = 0 ;i <num ; i++){
 		interface = msg_content_at_frame(m,2+i);
-		add_rule(ev,"iptables", "raw", "PREROUTING","-i %s -m pkttype --pkt-type multicast -j DROP",interface);
-		add_rule(ev,"iptables", "raw", "OUTPUT","-o %s -m pkttype --pkt-type multicast -j DROP",interface);
+		add_netfilter_rule(ev,"iptables", "raw", "PREROUTING","-i %s -m pkttype --pkt-type multicast -j DROP",interface);
+		add_netfilter_rule(ev,"iptables", "raw", "OUTPUT","-o %s -m pkttype --pkt-type multicast -j DROP",interface);
 	}
 }
 
@@ -1363,7 +1405,7 @@ static void packet_filter(event_t* ev,const msg_t* m)
 		}
 		stringbuffer_add_f(buf,"-j %s",action);
 
-		add_rule(ev,"iptables","raw","PREROUTING",stringbuffer_get(buf));
+		add_netfilter_rule(ev,"iptables","raw","PREROUTING",stringbuffer_get(buf));
 	}
 	stringbuffer_destroy(buf);
 }
@@ -1380,7 +1422,7 @@ static void ping_filter(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);
 
 	if(enable){
-		add_rule(ev,"iptables","filter","INPUT","-p icmp --icmp-type echo-request -j DROP");
+		add_netfilter_rule(ev,"iptables","filter","INPUT","-p icmp --icmp-type echo-request -j DROP");
 	}
 }
 /*
@@ -1396,8 +1438,8 @@ static void igmp_filter(event_t* ev,const msg_t* m)
 	del_rule_by_event(ev);
 
 	if(enable){
-		add_rule(ev,"iptables","raw","PREROUTING","-p igmp -j DROP");
-		add_rule(ev,"iptables","raw","OUTPUT","-p igmp -j DROP");
+		add_netfilter_rule(ev,"iptables","raw","PREROUTING","-p igmp -j DROP");
+		add_netfilter_rule(ev,"iptables","raw","OUTPUT","-p igmp -j DROP");
 	}
 
 }
@@ -1452,18 +1494,18 @@ static void port_trigger(event_t* ev,const msg_t* m)
 		l_sport 	= msg_content_at_frame(m,6+6*i); 
 		l_eport 	= msg_content_at_frame(m,7+6*i); 
 		/* tcp */
-		add_rule(ev,"iptables","filter","FORWARD","-i %s -o %s -p tcp --dport %s:%s -j autofw --action filter"
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-i %s -o %s -p tcp --dport %s:%s -j autofw --action filter"
 							,wan_interface,lan_interface,w_sport,w_eport);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s:%s -j autofw --action nat",
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s:%s -j autofw --action nat",
 							wan_interface,w_sport,w_eport);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s:%s -j autofw --action trigger --related-proto tcp --related-dport %s-%s --related-to %s-%s",
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s:%s -j autofw --action trigger --related-proto tcp --related-dport %s-%s --related-to %s-%s",
 		lan_interface,l_sport,l_eport,l_sport,l_eport,w_sport,w_eport);
 		/* udp */
-		add_rule(ev,"iptables","filter","FORWARD","-i %s -o %s -p udp --dport %s:%s -j autofw --action filter"
+		add_netfilter_rule(ev,"iptables","filter","FORWARD","-i %s -o %s -p udp --dport %s:%s -j autofw --action filter"
 							,wan_interface,lan_interface,w_sport,w_eport);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p udp --dport %s:%s -j autofw --action nat",
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p udp --dport %s:%s -j autofw --action nat",
 							wan_interface,w_sport,w_eport);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p udp --dport %s:%s -j autofw --action trigger --related-proto udp --related-dport %s-%s --related-to %s-%s",
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p udp --dport %s:%s -j autofw --action trigger --related-proto udp --related-dport %s-%s --related-to %s-%s",
 		lan_interface,l_sport,l_eport,l_sport,l_eport,w_sport,w_eport);
 	}
 }                                                                               
@@ -1487,7 +1529,8 @@ static void port_forwarding(event_t* ev,const msg_t* m)
 		wan_port = msg_content_at_frame(m,3+4*i);
 		lan_ip = msg_content_at_frame(m,4+4*i);
 		lan_port = msg_content_at_frame(m,5+4*i);
-		add_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s -j DNAT --to %s:%s",wan_interface,wan_port,lan_ip,lan_port);
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p tcp --dport %s -j DNAT --to %s:%s",wan_interface,wan_port,lan_ip,lan_port);
+		add_netfilter_rule(ev,"iptables","nat","PREROUTING","-i %s -p udp --dport %s -j DNAT --to %s:%s",wan_interface,wan_port,lan_ip,lan_port);
 	}
 
 
@@ -1536,7 +1579,7 @@ static void mss_clamping(event_t* ev,const msg_t* m)
 	enable = atoi( msg_content_at_frame(m,1));
 	del_rule_by_event(ev);
 	if(enable){
-		add_rule(ev,"iptables","mangle","FORWARD","-p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu");
+		add_netfilter_rule(ev,"iptables","mangle","FORWARD","-p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu");
 	}
 }
 /*
@@ -1562,4 +1605,71 @@ static void mgmt_channel_setup(event_t* ev,const msg_t* m)
 	/* add default gw */
 	add_ip_rule(ev,"route","default via %s dev %s",gw,interface);
 
+}
+static void snat(event_t* ev,const msg_t* m)
+{
+	int enable;
+	int id;
+	const char* interface;
+	nfc_dbg("\n");
+	
+	enable	  = atoi(msg_content_at_frame(m,1)); 
+	id	  = atoi(msg_content_at_frame(m,2)); 
+	interface = msg_content_at_frame(m,3); 
+	
+	if(enable)
+		add_netfilter_rule_and_id(ev,id,"iptables","nat","POSTROUTING","-o %s -j MASQUERADE",interface);
+	else
+		del_rule_by_id(ev,id);
+		
+}
+static void lte_interface_basic_setup(event_t* ev,const msg_t* m)
+{
+	int i;
+	int enable;
+	int cid;
+	int should_broute;
+	const char* routing_table_id;
+	const char* ims_ip;
+	const char* gw_ip;
+	const char* interface;	
+	const char* interface_ip;
+	int number_of_dns;
+	const char* dns_ip;
+	nfc_dbg("\n");
+
+	enable	  	 = atoi(msg_content_at_frame(m,1)); 
+	cid	  	 = atoi(msg_content_at_frame(m,2)); 
+	should_broute  	 = atoi(msg_content_at_frame(m,3)); 
+	routing_table_id = msg_content_at_frame(m,4); 
+	ims_ip 		 = msg_content_at_frame(m,5); 
+	gw_ip 		 = msg_content_at_frame(m,6); 
+	interface 	 = msg_content_at_frame(m,7); 
+	interface_ip 	 = msg_content_at_frame(m,8); 
+	number_of_dns 	 = atoi(msg_content_at_frame(m,9)); 
+
+	nfc_dbg("enable: %d\n",enable);
+
+	if(!enable){
+		del_rule_by_id(ev,cid);
+		return;
+	}
+	/* policy routing */
+	/* ims */
+	if(strcmp(ims_ip,"")) add_ip_rule_and_id(ev,cid,"rule","to %s table %s",ims_ip,routing_table_id);
+	/* dns */
+	/* pkts to the interface */
+	add_ip_rule_and_id(ev,cid,"rule","iif %s table %s",interface,routing_table_id);
+	nfc_dbg(".......\n");
+	/* local pkts with source IP bound to interface */
+	add_ip_rule_and_id(ev,cid,"rule","from %s table %s",interface_ip,routing_table_id);
+	/* routing rule */
+	add_ip_rule_and_id(ev,cid,"route","default via %s dev %s table %s",gw_ip,interface,routing_table_id);	
+	/* broute */
+	if(should_broute) add_netfilter_rule_and_id(ev,cid,"ebtables","broute","BROUTING","-i %s -j DROP",interface);
+	
+	for(i = 0 ;i< number_of_dns ; i++){		
+		dns_ip = msg_content_at_frame(m,10+i);
+		add_ip_rule_and_id(ev,cid,"rule","to %s table %s",dns_ip,routing_table_id);
+	}
 }

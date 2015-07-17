@@ -47,7 +47,6 @@ typedef struct _network_function_center{
 	/* element is of type (event_t*,number of rule in the table) */
 	list_t* chain[MAX_CHAIN];
 	list_t*	list_other_rule;	/* keep ip, route cmd */
-	int id_pool; /* only increase , assume that it won't overflow */
 	void* base; /* libevent base */
 }nfc_t;
 
@@ -55,6 +54,7 @@ struct _event{
 	void* priv; /* event specific pointer */	
 	stringbuffer_t *del_cmd ; /* buffer for event to use */
 	const event_info_t* info;
+	int id_pool;              /* starts from 1024 */
 	nfc_t* center;
 };
 

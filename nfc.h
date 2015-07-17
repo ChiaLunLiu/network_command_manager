@@ -10,7 +10,6 @@ msg_t*  nfc_mode_setup(const char* network_mode, const char* radio_interface_nam
 
 msg_t* nfc_ip_passthrough( const char* op);
 
-msg_t* nfc_data_channel_setup(int op, int should_broute, int table_id, const char* ims_ip, const char*gw_ip,const char* interface_name, const char* ip, int number_of_dns, char** dns_ip);
 
 msg_t* nfc_access_restriction(int number_of_rule,const char** mac, const char** day,const char** start_time,const char** end_time, const char** url, const char** keyword);
 
@@ -41,14 +40,19 @@ msg_t* nfc_telnet(int enable,int num,const char** interfaces);
 msg_t* nfc_http(int enable,int port);
 msg_t* nfc_https(int enable,int port);
 msg_t* nfc_port_trigger(int number_of_rule, const char** wan_interfaces, const char** lan_interfaces, const char** wan_starting_port, const char** wan_ending_port, const char** lan_starting_port, const char** lan_ending_port);
+msg_t* nfc_port_forwarding(int number_of_rule,const char** interface, const char** wan_port, const char** lan_ip,const char** lan_port);
+msg_t* nfc_dmz(int number_of_rule, const char** interfaces, const char** ip);
+msg_t* nfc_data_channel_setup(int enable,int should_broute,int table_id,const char* ims_ip, const char* gw_ip, const char* data_subnet, const char* interface, const char* interface_ip,int number_of_dns, const char** dns_ip);
+msg_t* nfc_snat(int enable,int id,const char* interface);
+msg_t* nfc_interface_basic_setup(int enable, int cid, int should_broute,const char* routing_table_id,const char* ims_ip, const char* gw_ip, const char* interface, const char* interface_ip, int number_of_dns, const char** dns_ip);
+
+
 /*
 msg_t* nfc_voice_channel_setup(const msg_t* m);
 msg_t* nfc_mgmt_channel_setup(const msg_t* m);
 msg_t* nfc_dhcp(const msg_t* m);
-msg_t* nfc_dmz(const msg_t* m);
 msg_t* nfc_pots(const msg_t* m);
 msg_t* nfc_dynamic_qos(const msg_t* m);
-msg_t* nfc_port_forwarding(const msg_t* m);
 msg_t* nfc_vlan_tagging(const msg_t* m);
 msg_t* nfc_static_routing(const msg_t* m);
 msg_t* nfc_mss_clamping(const msg_t* m);
