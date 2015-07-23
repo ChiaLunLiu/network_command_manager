@@ -61,7 +61,11 @@ static void vlan_tagging(event_t* ev,const msg_t* m);
 static void static_routing(event_t* ev,const msg_t* m);
 static void mss_clamping(event_t* ev,const msg_t* m);
 static void snat(event_t* ev,const msg_t* m);
-static void lte_interface_basic_setup(event_t* ev,const msg_t* m);
+static void interface_basic_setup(event_t* ev,const msg_t* m);
+static void clean_all(event_t* ev,const msg_t* m);
+static void data_route(event_t* ev,const msg_t* m);
+static void voice_route(event_t* ev,const msg_t* m);
+static void voice_rtp_route(event_t* ev,const msg_t* m);
 
 static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 
@@ -105,7 +109,10 @@ static const event_info_t event_info[]={
 {"mss_clamping",mss_clamping,  				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,-1,0,0,0,0} },
 {"mgmt channel setup",mgmt_channel_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
 {"snat",snat,						{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"lte interface basic setup",lte_interface_basic_setup,	{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"interface basic setup",interface_basic_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"clean all",clean_all,					{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"data route",data_route,				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"voice route",voice_route,				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
 };
 
 str_int_pair_t chain_mapping[]={
@@ -1623,11 +1630,11 @@ static void snat(event_t* ev,const msg_t* m)
 		del_rule_by_id(ev,id);
 		
 }
-static void lte_interface_basic_setup(event_t* ev,const msg_t* m)
+static void interface_basic_setup(event_t* ev,const msg_t* m)
 {
 	int i;
 	int enable;
-	int cid;
+	int id;
 	int should_broute;
 	const char* routing_table_id;
 	const char* ims_ip;
@@ -1639,7 +1646,7 @@ static void lte_interface_basic_setup(event_t* ev,const msg_t* m)
 	nfc_dbg("\n");
 
 	enable	  	 = atoi(msg_content_at_frame(m,1)); 
-	cid	  	 = atoi(msg_content_at_frame(m,2)); 
+	id	  	 = atoi(msg_content_at_frame(m,2)); 
 	should_broute  	 = atoi(msg_content_at_frame(m,3)); 
 	routing_table_id = msg_content_at_frame(m,4); 
 	ims_ip 		 = msg_content_at_frame(m,5); 
@@ -1651,25 +1658,108 @@ static void lte_interface_basic_setup(event_t* ev,const msg_t* m)
 	nfc_dbg("enable: %d\n",enable);
 
 	if(!enable){
-		del_rule_by_id(ev,cid);
+		del_rule_by_id(ev,id);
 		return;
 	}
 	/* policy routing */
 	/* ims */
-	if(strcmp(ims_ip,"")) add_ip_rule_and_id(ev,cid,"rule","to %s table %s",ims_ip,routing_table_id);
+	if(strcmp(ims_ip,"")) add_ip_rule_and_id(ev,id,"rule","to %s table %s",ims_ip,routing_table_id);
 	/* dns */
 	/* pkts to the interface */
-	add_ip_rule_and_id(ev,cid,"rule","iif %s table %s",interface,routing_table_id);
+	add_ip_rule_and_id(ev,id,"rule","iif %s table %s",interface,routing_table_id);
 	nfc_dbg(".......\n");
 	/* local pkts with source IP bound to interface */
-	add_ip_rule_and_id(ev,cid,"rule","from %s table %s",interface_ip,routing_table_id);
+	add_ip_rule_and_id(ev,id,"rule","from %s table %s",interface_ip,routing_table_id);
 	/* routing rule */
-	add_ip_rule_and_id(ev,cid,"route","default via %s dev %s table %s",gw_ip,interface,routing_table_id);	
+	add_ip_rule_and_id(ev,id,"route","default via %s dev %s table %s",gw_ip,interface,routing_table_id);	
 	/* broute */
-	if(should_broute) add_netfilter_rule_and_id(ev,cid,"ebtables","broute","BROUTING","-i %s -j DROP",interface);
+	if(should_broute) add_netfilter_rule_and_id(ev,id,"ebtables","broute","BROUTING","-i %s -j DROP",interface);
 	
 	for(i = 0 ;i< number_of_dns ; i++){		
 		dns_ip = msg_content_at_frame(m,10+i);
-		add_ip_rule_and_id(ev,cid,"rule","to %s table %s",dns_ip,routing_table_id);
+		add_ip_rule_and_id(ev,id,"rule","to %s table %s",dns_ip,routing_table_id);
 	}
+}
+static void clean_all(event_t* ev,const msg_t* m)
+{
+	list_node_t* ln;
+	list_iterator_t * it;
+	nfc_t* center;
+	event_t* tmp;
+	nfc_dbg("\n");
+
+	center = ev->center;
+	it = list_iterator_new(center->list_event, LIST_HEAD);
+        while(ln = list_iterator_next(it) ){
+		tmp = (event_t*)ln->val;
+		nfc_dbg("delete rules of event %s\n",tmp->info->event_name);
+		del_rule_by_event(tmp);
+        }
+    	list_iterator_destroy(it);
+}
+static void data_route(event_t* ev,const msg_t* m)
+{
+	int enable;
+	const char*interface;
+	int routing_table_id;
+
+	nfc_dbg("\n");
+	
+	enable = atoi( msg_content_at_frame(m,1));
+	interface =  msg_content_at_frame(m,2);
+	routing_table_id = atoi(msg_content_at_frame(m,3));
+
+	if(!enable){
+		del_rule_by_event(ev);
+		return;
+	}
+	add_ip_rule(ev,"rule","iif %s table %s",interface,routing_table_id);
+	
+}
+static void voice_route(event_t* ev,const msg_t* m)
+{
+
+	int enable;
+	const char*interface;
+	int routing_table_id;
+
+	nfc_dbg("\n");
+	
+	enable = atoi( msg_content_at_frame(m,1));
+	interface =  msg_content_at_frame(m,2);
+	routing_table_id = atoi(msg_content_at_frame(m,3));
+
+	if(!enable){
+		del_rule_by_event(ev);
+		return;
+	}
+	/* sip packet */
+	add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-i %s -p udp --dport 5060 -j MARK --set-mark 1/1",interface);
+	add_ip_rule(ev,"rule","iif %s fwmark 1/1 table %s",interface,routing_table_id);
+	/* rtp packet */
+	add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-i %s -p udp --dport 5060 -j NFQUEUE --queue-num 1",interface);
+}
+static void voice_rtp_route(event_t* ev,const msg_t* m)
+{
+	int enable;
+	int id;
+	const char*interface;
+	const char* media_ip;
+	int media_port;
+
+	nfc_dbg("\n");
+	
+	enable = atoi( msg_content_at_frame(m,1));
+	id = atoi( msg_content_at_frame(m,2));
+	interface =  msg_content_at_frame(m,3);
+	media_ip = msg_content_at_frame(m,4);
+	media_port = atoi( msg_content_at_frame(m,5));
+
+	if(!enable){
+		del_rule_by_id(ev,id);
+		return;
+	}
+	/* tag mark for policy routing */
+	add_netfilter_rule_and_id(ev,id,"iptables","mangle","PREROUTING","-i %s -p udp -s %s--sport %d -j MARK --set-mark 1/1",interface,media_ip,media_port);
+	
 }

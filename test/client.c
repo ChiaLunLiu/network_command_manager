@@ -71,6 +71,7 @@ void test_dmz_clear(int sock);
 void test_data_channel_setup_set(int sock);
 void test_snat(int sock);
 void test_interface_basic_setup(int sock); 
+void test_clean_all(int sock);
 void print_help()
 {
 	printf("["SPACING"]: network_mode, radio_interface_name, radio_interface_vendor, number_of_ether_interface"
@@ -443,6 +444,12 @@ void test_interface_basic_setup(int sock)
 	msg_send(sock,m);
 	
 }
+void test_clean_all(int sock)
+{
+	msg_t* m;
+	m = nfc_clean_all();
+	msg_send(sock,m);
+}
 int main(int argc,char** argv)
 {
 	int sock;
@@ -487,7 +494,7 @@ int main(int argc,char** argv)
 	}
 	puts("Connected");
 	/* starting test */
-	test_mode_setup_nat(sock);
+/*	test_mode_setup_nat(sock);
 	test_mode_setup_bridge(sock);
 
 	test_ip_passthrough_start(sock);
@@ -548,9 +555,9 @@ int main(int argc,char** argv)
 	test_data_channel_setup_set(sock);
 
 	test_snat(sock);
-	test_interface_basic_setup(sock);
+*/	test_interface_basic_setup(sock);
 
-
+	test_clean_all(sock);
 	close(sock);	
 	return 0;
 }

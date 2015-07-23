@@ -354,15 +354,15 @@ msg_t* nfc_snat(int enable,int id,const char* interface)
 	msg_append_string(m,interface);
 	return m;	
 }
-msg_t* nfc_interface_basic_setup(int enable, int cid, int should_broute,const char* routing_table_id,const char* ims_ip, const char* gw_ip, const char* interface, const char* interface_ip, int number_of_dns, const char** dns_ip)
+msg_t* nfc_interface_basic_setup(int enable, int id, int should_broute,const char* routing_table_id,const char* ims_ip, const char* gw_ip, const char* interface, const char* interface_ip, int number_of_dns, const char** dns_ip)
 {
 	int i;
 	msg_t* m;
 	m = msg_alloc();
 	if(!m)return NULL;
-	msg_append_string(m,"lte interface basic setup");
+	msg_append_string(m,"interface basic setup");
 	msg_append_string_f(m,"%d",enable);
-	msg_append_string_f(m,"%d",cid);
+	msg_append_string_f(m,"%d",id);
 	msg_append_string_f(m,"%d",should_broute);
 	msg_append_string(m,routing_table_id);
 	msg_append_string(m,ims_ip);
@@ -373,4 +373,12 @@ msg_t* nfc_interface_basic_setup(int enable, int cid, int should_broute,const ch
 	for(i = 0 ;i < number_of_dns ; i++)msg_append_string(m,dns_ip[i]);
 	return m;
 	
+}
+msg_t* nfc_clean_all()
+{
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"clean all");
+	return m;
 }
