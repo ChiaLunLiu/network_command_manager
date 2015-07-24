@@ -131,6 +131,8 @@ int main()
 	nfc_dbg("start dispatching ...\n");	
 	event_base_dispatch(center->base);		
 end:
+	nfc_dbg("remove all rules ... \n");
+	_clean_all(center);	
 	nfc_dbg("program is shut down\n");
 	nfc_free(center);
 	minimsg_free_context(ctx);

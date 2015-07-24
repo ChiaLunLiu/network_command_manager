@@ -74,7 +74,7 @@ void nfc_free(nfc_t* center);
  *--------------------------
  */
 void nfc_msg_process(nfc_t* center,msg_t* m);
-
+void _clean_all(nfc_t* center);
 
 
 #endif

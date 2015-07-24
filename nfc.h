@@ -17,7 +17,7 @@ msg_t* nfc_vpn_passthrough(int gre,int l2tp,int pppoe,int ipsec, int pptp);
 
 msg_t* nfc_multicast_filter(int number,const char** interface);
 
-msg_t* nfc_packet_filter(int number,const char** action, const char** interface, const char** protocol, const char** source_ip,const char** source_mask,const char** destination_ip,const char** destination_mask,const char** source_starting_port,const char** source_ending_port,const char** destination_starting_port,const char** destination_ending_port,const char** icmp_type,const char** icmp_code);
+msg_t* nfc_user_specified_filter(int number,const char** action, const char** interface,const char** source_mac, const char** protocol, const char** source_ip,const char** source_mask,const char** destination_ip,const char** destination_mask,const char** source_starting_port,const char** source_ending_port,const char** destination_starting_port,const char** destination_ending_port,const char** icmp_type,const char** icmp_code);
 
 msg_t* nfc_igmp_filter(int enable);
 
@@ -25,7 +25,7 @@ msg_t* nfc_ping_filter(int enable);
 
 msg_t* nfc_mgmt_dscp(int enable,int dscp_value,const char* interface);
 msg_t* nfc_data_dscp(int enable,int dscp_value,const char* interface);
-msg_t* nfc_voice_dscp(int sip_dscp_enable,int rtp_rtcp_dscp_enable,const char* interface,const char* sip_protocol, const char* sip_dscp_value, const char* rtp_rtcp_dscp_value, int use_pattern_for_rtp_rtcp, const char* pattern_protocol, const char* pattern_ip, const char* pattern_starting_port, const char* pattern_ending_port);
+msg_t* nfc_voice_dscp(int sip_dscp_enable,int rtp_dscp_enable,int rtcp_dscp_enable,const char* interface,const char* sip_protocol, int sip_dscp_value, int rtp_dscp_value, int rtcp_dscp_value);
 
 msg_t* nfc_dscp_tagging_with_timeout(int enable, const char* protocol, const char* media_ip, const char* media_port, const char* dscp_value, const char* interface, int timeout_value);
 
@@ -47,6 +47,13 @@ msg_t* nfc_snat(int enable,int id,const char* interface);
 msg_t* nfc_interface_basic_setup(int enable, int id, int should_broute,const char* routing_table_id,const char* ims_ip, const char* gw_ip, const char* interface, const char* interface_ip, int number_of_dns, const char** dns_ip);
 
 msg_t* nfc_clean_all();
+msg_t* nfc_voice_route(int enable, const char* interface, int routing_table_id);
+msg_t* nfc_voice_rtp_route(int enable, int id,const char* interface, const char* media_ip, int media_port);
+
+msg_t* nfc_mgmt_vlan(int enable, int vlan_id, int vlan_priority,const char* interface);
+msg_t* nfc_data_vlan(int enable, int vlan_id, int vlan_priority,const char* interface);
+msg_t* nfc_voice_vlan(int forward_enable, int onboard_enable, const char* sip_protocol,int vlan_id, int vlan_priority,const char* interface);
+
 
 /*
 msg_t* nfc_voice_channel_setup(const msg_t* m);

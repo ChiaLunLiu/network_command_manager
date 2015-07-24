@@ -15,7 +15,8 @@
 #define TIME 10
 #define SPACING "%-20s"
 
-
+/* global variable */
+int g_sock;
 void test_mode_setup_nat(int sock);
 void test_mode_setup_bridge(int sock);
 void test_ip_passthrough_start(int sock);
@@ -26,18 +27,24 @@ void test_vpn_passthrough_set(int sock);
 void test_vpn_passthrough_clear(int sock);
 void test_multicast_filter_set(int sock);
 void test_multicast_filter_clear(int sock);
-void test_packet_filter_set(int sock);
-void test_packet_filter_clear(int sock);
+void test_user_specified_filter_set(int sock);
+void test_user_specified_filter_clear(int sock);
 void test_igmp_filter_set(int sock);
 void test_igmp_filter_clear(int sock);
-void test_ping_filter_set(int sock);
-void test_ping_filter_clear(int sock);
-void test_mgmt_dscp_set(int sock);
-void test_mgmt_dscp_clear(int sock);
-void test_data_dscp_set(int sock);
-void test_data_dscp_clear(int sock);
-void test_voice_dscp_set(int sock);
-void test_voice_dscp_clear(int sock);
+
+void ping_filter_set();
+void ping_filter_clear();
+void mgmt_dscp_set();
+void mgmt_dscp_clear();
+void data_dscp_set();
+void data_dscp_clear();
+void voice_dscp_set();
+void voice_dscp_clear();
+void mgmt_vlan_set();
+void mgmt_vlan_clear();
+void data_vlan_set();
+void data_vlan_clear();
+
 void test_dscp_tagging_with_timeout_set(int sock);
 void test_dscp_tagging_with_timeout_delete_after_timeout(int sock);
 void test_dscp_tagging_with_timeout_refresh(int sock);
@@ -72,6 +79,9 @@ void test_data_channel_setup_set(int sock);
 void test_snat(int sock);
 void test_interface_basic_setup(int sock); 
 void test_clean_all(int sock);
+void test_voice_route(int sock);
+void test_voice_rtp_route(int sock);
+
 void print_help()
 {
 	printf("["SPACING"]: network_mode, radio_interface_name, radio_interface_vendor, number_of_ether_interface"
@@ -110,24 +120,24 @@ void test_ip_passthrough_stop(int sock)
 
 void test_access_restriction_set(int sock)
 {
-	const char* mac[]={"none","00:11:22:33:44:55"};
+	const char* mac[]={"","00:11:22:33:44:55"};
 	const char* day[]={"Mon","Tue"};
 	const char* s[]={"00:00","17:00"};
 	const char* e[]={"20:00","23:59"};
-	const char* url[]={"http://www.yahoo.com.tw","none"};
-	const char* keyword[]={"fuck","none"};
+	const char* url[]={"http://www.yahoo.com.tw",""};
+	const char* keyword[]={"fuck",""};
 	msg_t* m;
 	m = nfc_access_restriction(2,mac,day,s,e,url,keyword);
 	msg_send(sock,m);
 }
 void test_access_restriction_clear(int sock)
 {
-	const char* mac[]={"none","00:11:22:33:44:55"};
+	const char* mac[]={"","00:11:22:33:44:55"};
 	const char* day[]={"Mon","Tue"};
 	const char* s[]={"00:00","17:00"};
 	const char* e[]={"20:00","23:59"};
-	const char* url[]={"http://www.yahoo.com.tw","none"};
-	const char* keyword[]={"fuck","none"};
+	const char* url[]={"http://www.yahoo.com.tw",""};
+	const char* keyword[]={"fuck",""};
 	msg_t* m;
 	m = nfc_access_restriction(0,mac,day,s,e,url,keyword);
 	msg_send(sock,m);
@@ -161,29 +171,30 @@ void test_multicast_filter_clear(int sock)
 	msg_send(sock,m);
 }
 
-void test_packet_filter_set(int sock)
+void test_user_specified_filter_set(int sock)
 {
 	msg_t* m;
 	const char* act[]={"ACCEPT","DROP","ACCEPT","DROP"};
 	const char* itf[]={"eth1","eth2","eth3","eth4"};
+	const char* source_mac[]={"","11:22:33:44:55:66","",""};
 	const char* p[]={"tcp","udp","icmp","udp"};
-	const char* sip[]={"none","none","192.168.1.0","10.0.0.0"};
-	const char* smask[]={"none","none","24","8"};
-	const char* dip[]={"none","none","8.8.8.8","9.9.9.9"};
-	const char* dmask[]={"none","none","32","32"};
-	const char* ssport[]={"none","none","none","2000"};
-	const char* seport[]={"none","none","none","10000"};
-	const char* dsport[]={"3000","4000","none","none"};
-	const char* deport[]={"4000","5000","none","none"};
-	const char* type[]={"none","none","3","none"};
-	const char* code[]={"none","none","0","none"};
-	m = nfc_packet_filter(4,act,itf,p,sip,smask,dip,dmask,ssport,seport,dsport,deport,type,code);
+	const char* sip[]={"","","192.168.1.0","10.0.0.0"};
+	const char* smask[]={"","","24","8"};
+	const char* dip[]={"","","8.8.8.8","9.9.9.9"};
+	const char* dmask[]={"","","32","32"};
+	const char* ssport[]={"","","","2000"};
+	const char* seport[]={"","","","10000"};
+	const char* dsport[]={"3000","4000","",""};
+	const char* deport[]={"4000","5000","",""};
+	const char* type[]={"","","3",""};
+	const char* code[]={"","","0",""};
+	m = nfc_user_specified_filter(4,act,itf,source_mac,p,sip,smask,dip,dmask,ssport,seport,dsport,deport,type,code);
 	msg_send(sock,m);
 }
-void test_packet_filter_clear(int sock)
+void test_user_specified_filter_clear(int sock)
 {
 	msg_t* m;
-	m = nfc_packet_filter(0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
+	m = nfc_user_specified_filter(0,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL);
 	msg_send(sock,m);
 }
 
@@ -197,60 +208,6 @@ void test_igmp_filter_clear(int sock)
 {
 	msg_t* m;
 	m = nfc_igmp_filter(0);
-	msg_send(sock,m);
-}
-void test_ping_filter_set(int sock)
-{
-	msg_t* m;
-	m = nfc_ping_filter(1);
-	msg_send(sock,m);
-}
-void test_ping_filter_clear(int sock)
-{
-	msg_t* m;
-	m = nfc_ping_filter(0);
-	msg_send(sock,m);
-}
-void test_mgmt_dscp_set(int sock)
-{
-	msg_t* m;
-	m = nfc_mgmt_dscp(1,5,"eth2");
-	msg_send(sock,m);
-}
-void test_mgmt_dscp_clear(int sock)
-{
-	msg_t* m;
-	m = nfc_mgmt_dscp(0,5,"eth2");
-	msg_send(sock,m);
-}
-void test_data_dscp_set(int sock)
-{
-	msg_t* m;
-	m = nfc_data_dscp(1,6,"eth2");
-	msg_send(sock,m);
-}
-void test_data_dscp_clear(int sock)
-{
-	msg_t* m;
-	m = nfc_data_dscp(0,6,"eth2");
-	msg_send(sock,m);
-}
-void test_voice_dscp_set_1(int sock)
-{
-	msg_t* m;	
-	m=nfc_voice_dscp(1,1,"eth2","udp","1","2",1,"udp","8.8.8.8","50000","60000");
-	msg_send(sock,m);
-}
-void test_voice_dscp_set_2(int sock)
-{
-	msg_t* m;	
-	m=nfc_voice_dscp(1,1,"eth2","udp","1","2",0,"","","","");
-	msg_send(sock,m);
-}
-void test_voice_dscp_clear(int sock)
-{
-	msg_t* m;
-	m=nfc_voice_dscp(0,0,"eth2","udp","1","2",1,"udp","8.8.8.8","50000","60000");
 	msg_send(sock,m);
 }
 void test_dscp_tagging_with_timeout_set(int sock)
@@ -450,6 +407,42 @@ void test_clean_all(int sock)
 	m = nfc_clean_all();
 	msg_send(sock,m);
 }
+void test_voice_route(int sock)
+{
+	msg_t* m;
+	int enable = 1;
+	const char* interface= "eth0";
+	int routing_table_id = 22;
+	m = nfc_voice_route(enable,interface,routing_table_id);
+	msg_send(sock,m);
+}
+void test_voice_rtp_route(int sock)
+{
+	
+	msg_t* m;
+	int enable = 1;
+	int id = 1;
+	const char* interface= "eth0";
+	const char* media_ip ="2.2.2.2";
+	int port = 56;
+	m = nfc_voice_rtp_route(enable,id,interface,media_ip,port);
+	msg_send(sock,m);
+}
+
+
+struct cmd{
+	const char* name;
+	void (*set)();
+	void(*unset)();
+};
+struct cmd test_cmd[]={
+	{"ping filter",ping_filter_set,ping_filter_clear},
+	{"mgmt dscp",mgmt_dscp_set,mgmt_dscp_clear},
+	{"data dscp",data_dscp_set,data_dscp_clear},
+	{"voice dscp",voice_dscp_set,voice_dscp_clear},
+	{"mgmt vlan",mgmt_vlan_set,mgmt_vlan_clear},
+	{"data vlan",data_vlan_set,data_vlan_clear},
+};
 int main(int argc,char** argv)
 {
 	int sock;
@@ -457,6 +450,8 @@ int main(int argc,char** argv)
 	struct sockaddr_in server;
 	frame_t * f;
 	msg_t * m;
+	int sz;
+	int j;
 	const char* str;
 /*	struct sockaddr_un local;
 	 socklen_t sock_len; 
@@ -477,6 +472,8 @@ int main(int argc,char** argv)
 	server.sin_addr.s_addr = inet_addr("127.0.0.1");
 	server.sin_family = AF_INET;
 	server.sin_port = htons(12345);
+
+
 /*
 	for AF_LOCAL
 	addr = (struct sockaddr*)&local;
@@ -493,27 +490,42 @@ int main(int argc,char** argv)
 		return 1;
 	}
 	puts("Connected");
+	g_sock = sock;
 	/* starting test */
+	sz = sizeof(test_cmd)/sizeof( struct cmd);
+	printf("cmd size : %d\n",sz);
+	for(i = 2 ; i < argc ; i+=2){
+		for(j = 0 ;j< sz ;j++){
+			if(!strcmp(argv[i-1],test_cmd[j].name)) break;
+		}
+		if(j == sz)printf("unknown command : %s\n",argv[i-1]);
+		else{
+			if(!strcmp(argv[i],"1")) test_cmd[j].set();
+			else if(!strcmp(argv[i],"0")) test_cmd[j].unset();
+			else printf("unknown value :%s\n",argv[i]);
+		}
+	}
+
+//	test_igmp_filter_set(sock);
+//	test_igmp_filter_clear(sock);
+//	test_user_specified_filter_set(sock);
+//	test_user_specified_filter_clear(sock);
+//	test_multicast_filter_set(sock);
+//	test_multicast_filter_clear(sock);
+//	test_vpn_passthrough_set(sock);
+//	test_vpn_passthrough_clear(sock);
+//	test_access_restriction_set(sock);
+//	test_access_restriction_clear(sock);
 /*	test_mode_setup_nat(sock);
 	test_mode_setup_bridge(sock);
 
 	test_ip_passthrough_start(sock);
 	test_ip_passthrough_stop(sock);
 
-	test_access_restriction_set(sock);
-	test_access_restriction_clear(sock);
 	
-	test_vpn_passthrough_set(sock);
-	test_vpn_passthrough_clear(sock);
 
-	test_multicast_filter_set(sock);
-	test_multicast_filter_clear(sock);
 
-	test_packet_filter_set(sock);
-	//test_packet_filter_clear(sock);
 	
-	test_igmp_filter_set(sock);
-//	test_igmp_filter_clear(sock);
 	test_ping_filter_set(sock);
 	test_mgmt_dscp_set(sock);
 
@@ -555,9 +567,11 @@ int main(int argc,char** argv)
 	test_data_channel_setup_set(sock);
 
 	test_snat(sock);
-*/	test_interface_basic_setup(sock);
-
-	test_clean_all(sock);
+	test_interface_basic_setup(sock);
+*/
+//	test_voice_route(sock);
+//	test_voice_rtp_route(sock);
+//	test_clean_all(sock);
 	close(sock);	
 	return 0;
 }
@@ -622,4 +636,77 @@ void test_snmp_clear(int sock)
 	msg_t* m;
 	m = nfc_snmp(0);
 	msg_send(sock,m);
+}
+void ping_filter_set()
+{
+	msg_t* m;
+	printf("%s\n",__func__);
+	m = nfc_ping_filter(1);
+	msg_send(g_sock,m);
+}
+void ping_filter_clear()
+{
+	msg_t* m;
+	m = nfc_ping_filter(0);
+	msg_send(g_sock,m);
+}
+void mgmt_dscp_set()
+{
+	msg_t* m;
+	m = nfc_mgmt_dscp(1,5,"eth2");
+	msg_send(g_sock,m);
+}
+void mgmt_dscp_clear()
+{
+	msg_t* m;
+	m = nfc_mgmt_dscp(0,5,"eth2");
+	msg_send(g_sock,m);
+}
+void data_dscp_set()
+{
+	msg_t* m;
+	m = nfc_data_dscp(1,6,"eth2");
+	msg_send(g_sock,m);
+}
+void data_dscp_clear()
+{
+	msg_t* m;
+	m = nfc_data_dscp(0,6,"eth2");
+	msg_send(g_sock,m);
+}
+void voice_dscp_set()
+{
+	msg_t* m;	
+	m=nfc_voice_dscp(1,1,1,"eth2","udp",1,2,3);
+	msg_send(g_sock,m);
+}
+void voice_dscp_clear()
+{
+	msg_t* m;
+	m=nfc_voice_dscp(0,0,0,"eth2","udp",1,2,3);
+	msg_send(g_sock,m);
+}
+void mgmt_vlan_set()
+{
+	msg_t* m;
+	m=nfc_mgmt_vlan(1,2,3,"eth0");
+	msg_send(g_sock,m);
+}
+void mgmt_vlan_clear()
+{
+	msg_t* m;
+	m=nfc_mgmt_vlan(0,2,3,"eth0");
+	msg_send(g_sock,m);
+}
+void data_vlan_set()
+{
+	msg_t* m;
+	m=nfc_data_vlan(1,4,5,"eth0");
+	msg_send(g_sock,m);
+}
+void data_vlan_clear()
+{
+	msg_t* m;
+	m=nfc_data_vlan(0,4,5,"eth0");
+	msg_send(g_sock,m);
 }
