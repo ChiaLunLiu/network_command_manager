@@ -159,6 +159,23 @@ msg_t* nfc_voice_dscp(int sip_dscp_enable,int rtp_dscp_enable,int rtcp_dscp_enab
 	msg_append_string_f(m,"%d",rtcp_dscp_value);
 	return m;	
 }
+msg_t* nfc_voice_dscp2(int enable,int id,int rtp_enable,int rtcp_enable,const char* interface, int rtp_dscp_value,int rtcp_dscp_value,const char* media_ip,int media_port)
+{
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"voice dscp2");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string_f(m,"%d",id);
+	msg_append_string_f(m,"%d",rtp_enable);
+	msg_append_string_f(m,"%d",rtcp_enable);
+	msg_append_string(m,interface);
+	msg_append_string_f(m,"%d",rtp_dscp_value);
+	msg_append_string_f(m,"%d",rtcp_dscp_value);
+	msg_append_string(m,media_ip);
+	msg_append_string_f(m,"%d",media_port);
+	return m;	
+}
 msg_t* nfc_dscp_tagging_with_timeout(int enable, const char* protocol, const char* media_ip, const char* media_port, const char* dscp_value, const char* interface, int timeout_value)
 {
 	msg_t* m;
@@ -392,12 +409,12 @@ msg_t* nfc_voice_route(int enable, const char* interface, int routing_table_id)
 	msg_append_string_f(m,"%d",routing_table_id);
 	return m;	
 }
-msg_t* nfc_voice_rtp_route(int enable, int id,const char* interface, const char* media_ip, int media_port)
+msg_t* nfc_voice_route2(int enable, int id,const char* interface, const char* media_ip, int media_port)
 {
 	msg_t* m;
 	m = msg_alloc();
 	if(!m)return NULL;
-	msg_append_string(m,"voice rtp route");
+	msg_append_string(m,"voice rtp route2");
 	msg_append_string_f(m,"%d",enable);
 	msg_append_string_f(m,"%d",id);
 	msg_append_string(m,interface);
@@ -438,11 +455,35 @@ msg_t* nfc_voice_vlan(int forward_enable, int onboard_enable, const char* sip_pr
 	msg_append_string_f(m,"%d",forward_enable);
 	msg_append_string_f(m,"%d",onboard_enable);
 	msg_append_string(m,sip_protocol);
-	msg_append_string_f(m,"%d",enable);
 	msg_append_string_f(m,"%d",vlan_id);
 	msg_append_string_f(m,"%d",vlan_priority);
-	
 	msg_append_string(m,interface);
 	return m;
 	
+}
+msg_t* nfc_voice_vlan2(int enable,int id,int forward_or_onboard,int rtp_enable,int rtcp_enable,const char* media_ip,int media_port)
+{
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"voice vlan2");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string_f(m,"%d",id);
+	msg_append_string_f(m,"%d",forward_or_onboard);
+	msg_append_string_f(m,"%d",rtp_enable);
+	msg_append_string_f(m,"%d",rtcp_enable);
+	msg_append_string(m,media_ip);
+	msg_append_string_f(m,"%d",media_port);
+	return m;
+}
+msg_t* nfc_dynamic_qos(int enable,const char* mode, const char* interface)
+{
+	msg_t* m;
+	m = msg_alloc();
+	if(!m)return NULL;
+	msg_append_string(m,"dynamic qos");
+	msg_append_string_f(m,"%d",enable);
+	msg_append_string(m,mode);
+	msg_append_string(m,interface);
+	return m;
 }

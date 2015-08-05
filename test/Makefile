@@ -1,5 +1,5 @@
 all:
-	gcc -I.. client.c -O2 -o client -lminimsg -lnfc
+	gcc -I.. nfc_client.c -O2 -o nfc_client -lminimsg -lnfc
 clean:
-	rm -f client
+	rm -f nfc_client
 

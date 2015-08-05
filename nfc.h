@@ -26,6 +26,7 @@ msg_t* nfc_ping_filter(int enable);
 msg_t* nfc_mgmt_dscp(int enable,int dscp_value,const char* interface);
 msg_t* nfc_data_dscp(int enable,int dscp_value,const char* interface);
 msg_t* nfc_voice_dscp(int sip_dscp_enable,int rtp_dscp_enable,int rtcp_dscp_enable,const char* interface,const char* sip_protocol, int sip_dscp_value, int rtp_dscp_value, int rtcp_dscp_value);
+msg_t* nfc_voice_dscp2(int enable,int id,int rtp_enable,int rtcp_enable,const char* interface, int rtp_dscp_value,int rtcp_dscp_value,const char* media_ip,int media_port);
 
 msg_t* nfc_dscp_tagging_with_timeout(int enable, const char* protocol, const char* media_ip, const char* media_port, const char* dscp_value, const char* interface, int timeout_value);
 
@@ -48,19 +49,19 @@ msg_t* nfc_interface_basic_setup(int enable, int id, int should_broute,const cha
 
 msg_t* nfc_clean_all();
 msg_t* nfc_voice_route(int enable, const char* interface, int routing_table_id);
-msg_t* nfc_voice_rtp_route(int enable, int id,const char* interface, const char* media_ip, int media_port);
+msg_t* nfc_voice_route2(int enable, int id,const char* interface, const char* media_ip, int media_port);
 
 msg_t* nfc_mgmt_vlan(int enable, int vlan_id, int vlan_priority,const char* interface);
 msg_t* nfc_data_vlan(int enable, int vlan_id, int vlan_priority,const char* interface);
 msg_t* nfc_voice_vlan(int forward_enable, int onboard_enable, const char* sip_protocol,int vlan_id, int vlan_priority,const char* interface);
-
+msg_t* nfc_voice_vlan2(int enable,int id,int forward_or_onboard,int rtp_enable,int rtcp_enable,const char* media_ip,int media_port);
+msg_t* nfc_dynamic_qos(int enable,const char* mode, const char* interface);
 
 /*
 msg_t* nfc_voice_channel_setup(const msg_t* m);
 msg_t* nfc_mgmt_channel_setup(const msg_t* m);
 msg_t* nfc_dhcp(const msg_t* m);
 msg_t* nfc_pots(const msg_t* m);
-msg_t* nfc_dynamic_qos(const msg_t* m);
 msg_t* nfc_vlan_tagging(const msg_t* m);
 msg_t* nfc_static_routing(const msg_t* m);
 msg_t* nfc_mss_clamping(const msg_t* m);

@@ -44,6 +44,10 @@ void mgmt_vlan_set();
 void mgmt_vlan_clear();
 void data_vlan_set();
 void data_vlan_clear();
+void voice_vlan_set();
+void voice_vlan_clear();
+void voice_vlan2_set();
+void voice_vlan2_clear();
 
 void test_dscp_tagging_with_timeout_set(int sock);
 void test_dscp_tagging_with_timeout_delete_after_timeout(int sock);
@@ -442,6 +446,8 @@ struct cmd test_cmd[]={
 	{"voice dscp",voice_dscp_set,voice_dscp_clear},
 	{"mgmt vlan",mgmt_vlan_set,mgmt_vlan_clear},
 	{"data vlan",data_vlan_set,data_vlan_clear},
+	{"voice vlan",voice_vlan_set,voice_vlan_clear},
+	{"voice vlan2",voice_vlan2_set,voice_vlan2_clear},
 };
 int main(int argc,char** argv)
 {
@@ -708,5 +714,60 @@ void data_vlan_clear()
 {
 	msg_t* m;
 	m=nfc_data_vlan(0,4,5,"eth0");
+	msg_send(g_sock,m);
+}
+void voice_vlan_set()
+{
+	int forward_enable = 1;
+	int onboard_enable = 1;
+	const char* sip_protocol = "udp";
+	int vlan_id = 3;
+	int vlan_prio = 4;
+	const char* interface = "eth3";
+	msg_t* m;
+	m=nfc_voice_vlan(forward_enable,onboard_enable,sip_protocol,vlan_id,vlan_prio,interface);
+	msg_send(g_sock,m);
+}
+void voice_vlan_clear()
+{
+	int forward_enable = 0;
+	int onboard_enable = 0;
+	const char* sip_protocol = "udp";
+	int vlan_id = 3;
+	int vlan_prio = 4;
+	const char* interface = "eth3";
+	msg_t* m;
+	m=nfc_voice_vlan(forward_enable,onboard_enable,sip_protocol,vlan_id,vlan_prio,interface);
+	msg_send(g_sock,m);
+}
+void voice_vlan2_set()
+{
+	int enable=1;
+	int id=1;
+	int forward_or_onboard = 1;
+	int rtp_enable=1;
+	int rtcp_enable=1;
+	const char* media_ip="2.2.2.2";
+	int media_port=12345;
+	msg_t* m;
+	m=nfc_voice_vlan2(enable,id,forward_or_onboard,rtp_enable,rtcp_enable,media_ip,media_port);
+	msg_send(g_sock,m);
+	id = 2;
+	media_port = 22222;
+	m=nfc_voice_vlan2(enable,id,forward_or_onboard,rtp_enable,rtcp_enable,media_ip,media_port);
+	msg_send(g_sock,m);
+	
+}
+void voice_vlan2_clear()
+{
+	int enable=0;
+	int id=1;
+	int forward_or_onboard = 1;
+	int rtp_enable=1;
+	int rtcp_enable=1;
+	const char* media_ip="2.2.2.2";
+	int media_port=12345;
+	msg_t* m;
+	m=nfc_voice_vlan2(enable,id,forward_or_onboard,rtp_enable,rtcp_enable,media_ip,media_port);
 	msg_send(g_sock,m);
 }

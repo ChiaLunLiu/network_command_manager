@@ -33,6 +33,7 @@ static void mgmt_channel_setup(event_t* ev,const msg_t* m);
 static void mgmt_dscp(event_t* ev,const msg_t* m);
 static void data_dscp(event_t* ev,const msg_t* m);
 static void voice_dscp(event_t* ev,const msg_t* m);
+static void voice_dscp2(event_t* ev,const msg_t* m);
 
 static void dscp_tagging_with_timeout(event_t* ev,const msg_t* m);
 static void dhcp(event_t* ev,const msg_t* m);
@@ -65,10 +66,11 @@ static void interface_basic_setup(event_t* ev,const msg_t* m);
 static void clean_all(event_t* ev,const msg_t* m);
 static void data_route(event_t* ev,const msg_t* m);
 static void voice_route(event_t* ev,const msg_t* m);
-static void voice_rtp_route(event_t* ev,const msg_t* m);
+static void voice_route2(event_t* ev,const msg_t* m);
 static void mgmt_vlan(event_t* ev,const msg_t* m);
 static void data_vlan(event_t* ev,const msg_t* m);
 static void voice_vlan(event_t* ev,const msg_t* m);
+static void voice_vlan2(event_t* ev,const msg_t* m);
 
 static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 
@@ -76,50 +78,52 @@ static void add_timer(event_t* ev,msg_t* m,int timeout_value);
 /* variable defination */
 /* the smaller value,the higher priority */
 static const event_info_t event_info[]={
-{"mode setup",mode_setup,	 	   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"nat",nat,		         	   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0,-1,0,0, 0,0,0,0,0} },
-{"ip passthrough",ip_passthrough,	   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"data channel setup",data_channel_setup,  		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"voice channel setup",voice_channel_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"mgmt dscp",mgmt_dscp,			   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"data dscp",data_dscp,			   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 1,0,0,0,0} },
-{"voice dscp",voice_dscp,		   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 2,0,0,0,0} },
-{"dscp tagging with timeout",dscp_tagging_with_timeout, {0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"dmz",dmz,			   			{0,0, 0,0,0,0,0,0,0,0,0,0,10, 0,0,0, 0,0,0,0,0} },
-{"dhcp",dhcp,			   			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"udhcpc",udhcpc,			   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"ntp",ntp,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"oma",oma,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"acs",acs,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"snmp",snmp,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"dns",dns,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"telnet",telnet,			   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"upnp",upnp,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"pots",pots,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"http",http,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"https",https,				   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"access restriction",access_restriction,   		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"vpn passthrough",vpn_passthrough,   			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"multicast filter",multicast_filter,  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"user-specified filter",user_specified_filter,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"ping filter",ping_filter,	  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"igmp filter",igmp_filter,	  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"dynamic qos",dynamic_qos,	  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"port trigger",port_trigger,	  			{0,0,-1,0,0,0,0,0,0,0,0,0, 9, 0,0,0, 0,0,0,0,0} },
-{"port forwarding",port_forwarding,  			{0,0,-1,0,0,0,0,0,0,0,0,0, 8, 0,0,0, 0,0,0,0,0} },
-{"vlan tagging",vlan_tagging,	  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"static routing",static_routing,  			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"mss_clamping",mss_clamping,  				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0,-1,0,0,0,0} },
-{"mgmt channel setup",mgmt_channel_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"snat",snat,						{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"interface basic setup",interface_basic_setup,		{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"clean all",clean_all,					{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"data route",data_route,				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"voice route",voice_route,				{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"voice rtp route",voice_rtp_route,			{0,0, 0,0,0,0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
-{"mgmt vlan",mgmt_vlan,					{0,0, 0,0,0,10,0,0,0,0,0,0, 0, 0,0,1, 0,0,0,0,0} },
-{"data vlan",data_vlan,					{0,0, 0,0,0,10,0,0,0,0,0,0, 0, 0,0,0, 0,0,1,0,0} },
-{"voice vlan",voice_vlan,				{0,0, 0,0,0,10,0,0,0,0,0,0, 0, 0,0,2, 0,0,2,0,0} },
+{"mode setup",mode_setup,	 	   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"nat",nat,		         	   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0,-1,0,0, 0,0,0,0,0} },
+{"ip passthrough",ip_passthrough,	   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"data channel setup",data_channel_setup,  		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"voice channel setup",voice_channel_setup,		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"mgmt dscp",mgmt_dscp,			   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"data dscp",data_dscp,			   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 1,0,0,0,0} },
+{"voice dscp",voice_dscp,		   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 2,0,0,0,0} },
+{"voice dscp2",voice_dscp2,		   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 2,0,0,0,0} },
+{"dscp tagging with timeout",dscp_tagging_with_timeout, {0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"dmz",dmz,			   			{0,0, 0, 0,0, 0,0,0,0,0,0,0,10, 0,0,0, 0,0,0,0,0} },
+{"dhcp",dhcp,			   			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"udhcpc",udhcpc,			   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"ntp",ntp,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"oma",oma,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"acs",acs,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"snmp",snmp,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"dns",dns,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"telnet",telnet,			   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"upnp",upnp,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"pots",pots,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"http",http,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"https",https,				   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"access restriction",access_restriction,   		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"vpn passthrough",vpn_passthrough,   			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"multicast filter",multicast_filter,  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"user-specified filter",user_specified_filter,		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"ping filter",ping_filter,	  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"igmp filter",igmp_filter,	  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"dynamic qos",dynamic_qos,	  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"port trigger",port_trigger,	  			{0,0,-1, 0,0, 0,0,0,0,0,0,0, 9, 0,0,0, 0,0,0,0,0} },
+{"port forwarding",port_forwarding,  			{0,0,-1, 0,0, 0,0,0,0,0,0,0, 8, 0,0,0, 0,0,0,0,0} },
+{"vlan tagging",vlan_tagging,	  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"static routing",static_routing,  			{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"mss_clamping",mss_clamping,  				{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0,-1,0,0,0,0} },
+{"mgmt channel setup",mgmt_channel_setup,		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"snat",snat,						{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"interface basic setup",interface_basic_setup,		{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"clean all",clean_all,					{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"data route",data_route,				{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"voice route",voice_route,				{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"voice route2",voice_route2,				{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,0, 0,0,0,0,0} },
+{"mgmt vlan",mgmt_vlan,					{0,0, 0,-1,0,10,0,0,0,0,0,0, 0, 0,0,1, 0,0,0,0,0} },
+{"data vlan",data_vlan,					{0,0, 0,-1,0,10,0,0,0,0,0,0, 0, 0,0,0, 0,0,1,0,0} },
+{"voice vlan",voice_vlan,				{0,0, 0,-1,0,10,0,0,0,0,0,0, 0, 0,0,2, 0,0,2,0,0} },
+{"voice vlan2",voice_vlan2,				{0,0, 0, 0,0, 0,0,0,0,0,0,0, 0, 0,0,2, 0,0,2,0,0} },
 };
 
 str_int_pair_t chain_mapping[]={
@@ -466,7 +470,7 @@ nfc_t* nfc_create()
 	unsigned i,sz;
 	list_node_t* ln;
         event_t* ev;
-
+	event_t* tmp_ev1,*tmp_ev2;
 	center = malloc( sizeof( nfc_t));
 
 	if(!center) nfc_handle_error("malloc");
@@ -508,6 +512,23 @@ nfc_t* nfc_create()
 			if(!ev->priv) nfc_handle_error("list_new");
 		}
         }
+	/* special handling */
+	/* bind voice dscp2 to voice dscp */
+	tmp_ev1 = event_search(center,"voice dscp");
+	tmp_ev2 = event_search(center,"voice dscp2");
+	if(tmp_ev1 == NULL || tmp_ev2 == NULL) nfc_handle_error("voice dscp or voice dscp2 event does not exist");
+	tmp_ev1->priv = (void*)tmp_ev2;
+	/* bind voice vlan2 to voice vlan */
+	tmp_ev1 = event_search(center,"voice vlan");
+	tmp_ev2 = event_search(center,"voice vlan2");
+	if(tmp_ev1 == NULL || tmp_ev2 == NULL) nfc_handle_error("voice vlan or voice vlan2 event does not exist");
+	tmp_ev1->priv = (void*)tmp_ev2;
+	/* bind voice route2 to voice route */
+	tmp_ev1 = event_search(center,"voice route");
+	tmp_ev2 = event_search(center,"voice route2");
+	if(tmp_ev1 == NULL || tmp_ev2 == NULL) nfc_handle_error("voice route or voice route2 event does not exist");
+	tmp_ev1->priv = (void*)tmp_ev2;
+	
 	return center;
 
 }
@@ -855,12 +876,63 @@ static void voice_dscp(event_t* ev,const msg_t* m)
 		interface,sip_protocol,sip_dscp_value);
 	}
 	if(rtp_dscp_enable || rtcp_dscp_enable){
-			add_netfilter_rule(ev,"iptables","mangle","FORWARD","-i %s -p %s --sport 5060 -j NFQUEUE --queue-num 0",
+			add_netfilter_rule(ev,"iptables","mangle","FORWARD","-o %s -p %s --sport 5060 -j NFQUEUE --queue-num 0",
 			interface,sip_protocol);
+	}
+	else{
+		nfc_dbg("clear all rules of voice dscp2\n");
+		del_rule_by_event((event_t*) ev->priv);
 	}
 	/* TODO
 	 * pass the dscp and enable to packet_watcher
 	 */
+
+}
+/*
+ * voice_dscp2
+ * only handle forwarded packets
+ * DSCP default target is CONTINUE, so NFC inserts rules of voice_dscp2 after rules of data_dscp
+ * called by packet_watcher
+ */
+static void voice_dscp2(event_t* ev,const msg_t* m)
+{
+	int enable;
+	int id;
+	int rtp_enable;
+	int rtcp_enable;
+	const char* interface;
+	int rtp_dscp_value;
+	int rtcp_dscp_value;
+	const char* media_ip;
+	int media_port;
+
+	nfc_dbg("\n");
+
+	
+	enable  	= atoi(msg_content_at_frame(m,1));
+	id  		= atoi(msg_content_at_frame(m,2));
+	rtp_enable  	= atoi(msg_content_at_frame(m,3));
+	rtcp_enable  	= atoi(msg_content_at_frame(m,4));
+	interface 	= msg_content_at_frame(m,5);
+	rtp_dscp_value 	= atoi(msg_content_at_frame(m,6));
+	rtcp_dscp_value = atoi(msg_content_at_frame(m,7));
+	media_ip 	= msg_content_at_frame(m,8);
+	media_port 	= atoi(msg_content_at_frame(m,9));
+
+	if(!enable){
+		del_rule_by_id(ev,id);
+		return;
+	}
+
+
+	if(rtp_enable){
+		add_netfilter_rule_and_id(ev,id,"iptables","mangle","FORWARD","-o %s -p udp -s %s --sport %d -j DSCP --set-dscp %d",
+		interface,media_ip,media_port,rtp_dscp_value);
+	}
+	if(rtcp_enable){
+		add_netfilter_rule_and_id(ev,id,"iptables","mangle","FORWARD","-o %s -p udp -s %s --sport %d -j DSCP --set-dscp %d",
+		interface,media_ip,media_port+1,rtcp_dscp_value);
+	}
 
 }
 static void dscp_timeout_callback(int fd, short event, void *arg)
@@ -1465,20 +1537,30 @@ static void dynamic_qos(event_t* ev,const msg_t* m)
 
 	int enable;
 	const char* mode;
+	int ret;
+	const char* interface;	
+	enable 	  = atoi(msg_content_at_frame(m,1));
+	mode 	  = msg_content_at_frame(m,2);
+	interface = msg_content_at_frame(m,3);
 	nfc_dbg("\n");
-	int ret;	
-	enable = atoi(msg_content_at_frame(m,1));
-	mode = msg_content_at_frame(m,2);
-	
-	if(enable){
-		if(!strcmp(mode,"nat")) ret=system("/bin/dynamicQos.sh start nat");
-		else if(!strcmp(mode,"bridge"))	ret=system("/bin/dynamicQos.sh start bridge");
-		else nfc_dbg("unknown mode %s\n",mode);
+
+	if(!enable){	
+		del_rule_by_event(ev);
+		return;
 	}
-	else{
-		ret=system("/bin/dynamicQos.sh stop");
+
+	if(!strcmp(mode,"nat")){
+		add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-i %s -p tcp -j DYNAMICQOS --record-dscp",interface);
+		add_netfilter_rule(ev,"iptables","mangle","POSTROUTING","-o %s -p tcp -j DYNAMICQOS --replay-dscp",interface);
+		add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-i %s -p udp -j DYNAMICQOS --record-dscp",interface);
+		add_netfilter_rule(ev,"iptables","mangle","POSTROUTING","-o %s -p udp -j DYNAMICQOS --replay-dscp",interface);
 	}
-	nfc_dbg("system() returns %d\n",ret);
+	else if(!strcmp(mode,"bridge")){
+	     	add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-m physdev --physdev-in %s -p tcp -j DYNAMICQOS --record-dscp",interface);
+		add_netfilter_rule(ev,"iptables","mangle","POSTROUTING","-m physdev --physdev-out %s -p tcp -j DYNAMICQOS --replay-dscp",interface);
+	     	add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-m physdev --physdev-in %s -p udp -j DYNAMICQOS --record-dscp",interface);
+		add_netfilter_rule(ev,"iptables","mangle","POSTROUTING","-m physdev --physdev-out %s -p udp -j DYNAMICQOS --replay-dscp",interface);
+	}
 }
 /*
  * port trigger
@@ -1743,6 +1825,7 @@ static void voice_route(event_t* ev,const msg_t* m)
 
 	if(!enable){
 		del_rule_by_event(ev);
+		del_rule_by_event((event_t*) ev->priv);
 		return;
 	}
 	/* sip packet */
@@ -1751,7 +1834,7 @@ static void voice_route(event_t* ev,const msg_t* m)
 	/* rtp packet */
 	add_netfilter_rule(ev,"iptables","mangle","PREROUTING","-i %s -p udp --dport 5060 -j NFQUEUE --queue-num 1",interface);
 }
-static void voice_rtp_route(event_t* ev,const msg_t* m)
+static void voice_route2(event_t* ev,const msg_t* m)
 {
 	int enable;
 	int id;
@@ -1849,12 +1932,51 @@ static void voice_vlan(event_t* ev,const msg_t* m)
 	}
 	if(onboard_enable){
 		add_netfilter_rule(ev,"iptables","mangle","OUTPUT","-p %s --dport 5060 -j MARK --set-mark 0x30/0xf0",sip_protocol);
+		add_netfilter_rule(ev,"iptables","mangle","OUTPUT","-p %s --dport 5060 -j NFQUEUE --queue-num 3",sip_protocol);
 	}
-
 	if(forward_enable || onboard_enable){
 		/* tag */
 		add_netfilter_rule(ev,"ebtables","nat","POSTROUTING","-o %s -p 0x0800 --mark 0x30/0xf0 -j vtag --vtag-id %d --vtag-priority %d --vtag-action tag --vtag-target ACCEPT",interface,vlan_id,vlan_priority);
 		/* untag */	
 		add_netfilter_rule(ev,"ebtables","nat","PREROUTING","-i %s -p 0x8100 --vlan-id %d -j vtag --vtag-id %d --vtag-priority %d --vtag-action untag --vtag-target ACCEPT",interface,vlan_id,vlan_id,vlan_priority);
+	}
+	else{
+		nfc_dbg("clear all rules of voice vlan2\n");
+		del_rule_by_event( (event_t*) ev->priv);
+	}
+}
+static void voice_vlan2(event_t* ev,const msg_t* m)
+{
+	int enable;
+	int id;
+	int forward_or_onboard;
+	int rtp_enable;
+	int rtcp_enable;
+	const char* media_ip;
+	int media_port;
+
+	nfc_dbg("\n");
+	enable		  	= atoi(msg_content_at_frame(m,1));
+	id		  	= atoi(msg_content_at_frame(m,2));
+	forward_or_onboard	= atoi(msg_content_at_frame(m,3));
+	rtp_enable		= atoi(msg_content_at_frame(m,4));
+	rtcp_enable 		= atoi(msg_content_at_frame(m,5));
+	media_ip 		= msg_content_at_frame(m,6);
+	media_port 		= atoi(msg_content_at_frame(m,7));
+
+	
+	if(!enable){
+		del_rule_by_id(ev,id);
+		return;
+	}
+	/* forward */
+	if(forward_or_onboard == 1){
+		if( rtp_enable) add_netfilter_rule_and_id(ev,id,"iptables","mangle","FORWARD","-p udp -s %s --sport %d -j MARK --set-mark 0x30/0xf0",media_ip,media_port);
+		if( rtcp_enable) add_netfilter_rule_and_id(ev,id,"iptables","mangle","FORWARD","-p udp -s %s --sport %d -j MARK --set-mark 0x30/0xf0",media_ip,media_port+1);
+	}
+	/* onboard */	
+	else{
+		if( rtp_enable) add_netfilter_rule_and_id(ev,id,"iptables","mangle","OUTPUT","-p udp -s %s --sport %d -j MARK --set-mark 0x30/0xf0",media_ip,media_port);
+		if( rtcp_enable) add_netfilter_rule_and_id(ev,id,"iptables","mangle","OUTPUT","-p udp -s %s --sport %d -j MARK --set-mark 0x30/0xf0",media_ip,media_port+1);
 	}
 }
